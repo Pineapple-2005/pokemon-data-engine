@@ -1,4 +1,4 @@
-# Pokemon Data Mining — Engine Dashboard
+# Pokemon Data Mining — 3 Engine Dashboard
 
 Three ML-powered engines for Pokémon team building and battle prediction.
 
