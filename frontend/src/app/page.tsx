@@ -6,7 +6,8 @@ import dynamic from 'next/dynamic';
 import { StatCard } from '@/components/ui/StatCard';
 import { ProfessorOak } from '@/components/ui/ProfessorOak';
 import { api } from '@/lib/api';
-import type { PredictionWithResult, ModelMetrics } from '@/types';
+import { getTrainerProfile } from '@/lib/auth';
+import type { PredictionWithResult, ModelMetrics, TrainerProfile } from '@/types';
 
 const Pokeball3D = dynamic(() => import('@/components/ui/Pokeball3D').then(m => ({ default: m.Pokeball3D })), { ssr: false });
 
@@ -139,123 +140,369 @@ function ResultBadge({ b }: { readonly b: PredictionWithResult }) {
   return <span className="pk-vs-stamp wrong">✗ WRONG</span>;
 }
 
-/* Pokédex device — iconic red handheld with LCD screen left, info panel right */
+/* Pokédex device — Pokemon DS game style (Gen 4/5 Diamond/Pearl/Black/White) */
 function TrainerCard({
-  totalPokemon, assignedPokemon, totalBattles, accuracy, loading,
+  totalPokemon, assignedPokemon, totalBattles, accuracy, loading, trainer, lastTeam, leaderboard,
 }: {
   readonly totalPokemon: number | null;
   readonly assignedPokemon: number | null;
   readonly totalBattles: number | null;
   readonly accuracy: number | null;
   readonly loading: boolean;
+  readonly trainer: TrainerProfile | null;
+  readonly lastTeam: Array<{ name: string; pokeapi_id: number }> | null;
+  readonly leaderboard: import('@/types').LeaderboardEntry[] | null;
 }) {
   const accuracyPct = accuracy !== null ? accuracy * 100 : null;
-  const barWidth = accuracyPct !== null ? Math.min(accuracyPct, 100) : 0;
   const stars = accuracyPct !== null ? Math.round(accuracyPct / 20) : 0;
 
   const idNo = totalPokemon !== null
     ? `${String(totalPokemon).padStart(3, '0')}001`
     : '———';
 
+  const [showLaunchTip, setShowLaunchTip] = React.useState(false);
+  const [showCopyTip, setShowCopyTip] = React.useState(false);
+
+  async function handleLaunchBattle() {
+    try {
+      const { text } = await api.getShowdownExport();
+      await navigator.clipboard.writeText(text);
+      window.open('https://play.pokemonshowdown.com/teambuilder', '_blank', 'noopener,noreferrer');
+      setShowLaunchTip(true);
+      setTimeout(() => setShowLaunchTip(false), 4000);
+    } catch {
+      // silently fail — clipboard may be denied in some contexts
+    }
+  }
+
+  async function handleCopyTeam() {
+    try {
+      const { text } = await api.getShowdownExport();
+      await navigator.clipboard.writeText(text);
+      setShowCopyTip(true);
+      setTimeout(() => setShowCopyTip(false), 2000);
+    } catch {
+      // silently fail
+    }
+  }
+
+  // Derive the team ready status
+  const teamReady = React.useMemo(() => {
+    return lastTeam !== null && lastTeam.length > 0;
+  }, [lastTeam]);
+
+  // DS-style panel shared styles
+  const dsPanel: React.CSSProperties = {
+    background: '#f5f5f5',
+    border: '3px solid #1a1c2e',
+    borderRadius: '6px',
+    boxShadow: 'inset 2px 2px 0 rgba(255,255,255,0.8), inset -2px -2px 0 rgba(0,0,0,0.15)',
+  };
+
+  const dsPanelHeader: React.CSSProperties = {
+    background: '#1a1c2e',
+    borderRadius: '3px 3px 0 0',
+    padding: '3px 6px',
+    marginBottom: '5px',
+  };
+
   return (
     <div
       aria-label="Pokédex Trainer Data"
       style={{
         width: '100%',
-        maxWidth: '520px',
+        maxWidth: '760px',
+        flex: '1 1 680px',
         background: 'linear-gradient(135deg, #CC0000 0%, #EF4444 30%, #CC0000 70%, #991111 100%)',
         borderRadius: '12px 6px 6px 12px',
         border: '3px solid #880000',
         boxShadow: '0 8px 32px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,160,160,0.3), inset 0 -1px 0 rgba(0,0,0,0.3)',
-        padding: '10px',
+        padding: '0',
         display: 'flex',
         flexDirection: 'column',
-        gap: '8px',
+        gap: '0',
         position: 'relative',
         overflow: 'hidden',
       }}
     >
-      <div aria-hidden="true" style={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg, rgba(255,255,255,0.08) 0%, transparent 40%, rgba(0,0,0,0.06) 100%)', pointerEvents: 'none', borderRadius: 'inherit' }} />
-
-      {/* Top indicator lights row */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', paddingBottom: '6px', borderBottom: '2px solid #880000' }}>
-        <div aria-hidden="true" style={{ width: '22px', height: '22px', borderRadius: '50%', background: 'radial-gradient(circle at 35% 35%, #88ccff, #2266cc)', boxShadow: '0 0 8px rgba(34,102,204,0.8), 0 0 16px rgba(34,102,204,0.4)', border: '2px solid #1144aa', flexShrink: 0 }} />
-        {(['#FF4444', '#FFCC00', '#44CC44'] as const).map((color, i) => (
-          <div key={i} aria-hidden="true" style={{ width: '9px', height: '9px', borderRadius: '50%', background: color, boxShadow: `0 0 4px ${color}99`, border: '1px solid rgba(0,0,0,0.3)', flexShrink: 0 }} />
+      {/* Top navigation bar — DS Pokédex header */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '6px',
+        padding: '7px 10px',
+        background: 'linear-gradient(180deg, #CC0000, #8B0000)',
+        borderBottom: '2px solid #4a0000',
+      }}>
+        {/* Blue orb */}
+        <div aria-hidden="true" style={{ width: '20px', height: '20px', borderRadius: '50%', background: 'radial-gradient(circle at 35% 35%, #88ccff, #2266cc)', boxShadow: '0 0 6px rgba(34,102,204,0.7)', border: '2px solid #1144aa', flexShrink: 0 }} />
+        {/* Indicator dots */}
+        {(['#EF4444', '#F8D030', '#4A90D9'] as const).map((color, i) => (
+          <div key={i} aria-hidden="true" style={{ width: '8px', height: '8px', borderRadius: '50%', background: color, border: '1px solid rgba(0,0,0,0.4)', flexShrink: 0 }} />
         ))}
-        <span style={{ fontFamily: 'var(--font-pixel)', fontSize: '0.5rem', color: '#ffcccc', letterSpacing: '0.12em', marginLeft: '4px', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
-          POKÉDEX
+        {/* POKéDEX label */}
+        <span style={{ fontFamily: 'var(--font-pixel)', fontSize: '0.48rem', color: '#ffffff', letterSpacing: '0.14em', marginLeft: '4px' }}>
+          POK&#233;DEX
         </span>
-        <div aria-hidden="true" style={{ marginLeft: 'auto', display: 'flex', gap: '3px' }}>
+        {/* Right side bars */}
+        <div aria-hidden="true" style={{ marginLeft: 'auto', display: 'flex', gap: '3px', alignItems: 'center' }}>
           {[1,2,3,4,5,6].map(i => (
-            <div key={i} style={{ width: '4px', height: '12px', background: i <= 4 ? '#ffcccc' : 'rgba(255,255,255,0.2)', borderRadius: '1px', border: '1px solid rgba(0,0,0,0.3)' }} />
+            <div key={i} style={{ width: '3px', height: '10px', background: i <= 4 ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.15)', borderRadius: '1px' }} />
           ))}
         </div>
       </div>
 
-      {/* Main body */}
-      <div style={{ display: 'flex', gap: '8px', flex: 1 }}>
-        {/* LEFT: LCD screen panel */}
-        <div style={{ flex: '1 1 0', background: '#0d1a0d', border: '3px solid #1a2a1a', borderRadius: '4px', boxShadow: 'inset 0 0 12px rgba(0,0,0,0.8), inset 0 2px 4px rgba(0,0,0,0.6)', padding: '10px 8px', display: 'flex', flexDirection: 'column', gap: '3px', position: 'relative', overflow: 'hidden' }}>
-          <div aria-hidden="true" style={{ position: 'absolute', inset: 0, background: 'repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,255,60,0.025) 3px, rgba(0,255,60,0.025) 4px)', pointerEvents: 'none', zIndex: 1 }} />
-          <div style={{ position: 'relative', zIndex: 2 }}>
-            <p style={{ margin: '0 0 4px', fontFamily: 'var(--font-pixel)', fontSize: '0.45rem', color: '#22cc44', letterSpacing: '0.08em', textShadow: '0 0 6px rgba(34,204,68,0.6)' }}>TRAINER DATA</p>
-            <div style={{ height: '1px', background: '#22cc44', opacity: 0.4, marginBottom: '6px', boxShadow: '0 0 4px rgba(34,204,68,0.5)' }} />
-            {[
-              { label: 'POKÉMON', value: loading ? '—' : String(totalPokemon ?? '—') },
-              { label: 'BATTLES ', value: loading ? '—' : String(totalBattles ?? ' 0') },
-              { label: 'ACCURACY', value: loading ? '—' : (accuracyPct !== null ? `${accuracyPct.toFixed(1)}%` : '—') },
-              { label: 'ASSIGNED', value: loading ? '—' : String(assignedPokemon ?? '—') },
-            ].map(({ label, value }) => (
-              <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '3px' }}>
-                <span style={{ fontFamily: 'var(--font-pixel)', fontSize: '0.38rem', color: '#22aa44', letterSpacing: '0.04em' }}>{label}:</span>
-                <span style={{ fontFamily: 'var(--font-pixel)', fontSize: '0.44rem', color: '#44ee66', textShadow: '0 0 4px rgba(68,238,102,0.5)' }}>{value}</span>
+      {/* Main body — two panels side by side */}
+      <div style={{ display: 'flex', gap: '10px', padding: '10px', flex: 1, minHeight: '320px' }}>
+
+        {/* LEFT PANEL: Live Leaderboard */}
+        <div style={{ flex: '1 1 0', ...dsPanel, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          {/* Panel header */}
+          <div style={dsPanelHeader}>
+            <p style={{ margin: 0, fontFamily: 'var(--font-pixel)', fontSize: '0.42rem', color: '#ffffff', letterSpacing: '0.08em' }}>
+              &#9830; BATTLE LEADERBOARD
+            </p>
+          </div>
+
+          {/* Leaderboard rows */}
+          <div style={{ flex: 1, padding: '0 5px 4px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            {loading || leaderboard === null ? (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, minHeight: '80px' }}>
+                <p style={{ margin: 0, fontFamily: 'var(--font-pixel)', fontSize: '0.38rem', color: '#888', letterSpacing: '0.06em', textAlign: 'center' }}>
+                  LOADING...
+                </p>
               </div>
-            ))}
-            <div style={{ height: '1px', background: '#22cc44', opacity: 0.3, margin: '5px 0' }} />
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
-                <span style={{ fontFamily: 'var(--font-pixel)', fontSize: '0.35rem', color: '#22aa44' }}>ACC</span>
-                <span style={{ fontFamily: 'var(--font-pixel)', fontSize: '0.35rem', color: '#44ee66' }}>{loading ? '—' : accuracyPct !== null ? `${accuracyPct.toFixed(0)}%` : '—'}</span>
+            ) : leaderboard.length === 0 ? (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, minHeight: '80px' }}>
+                <p style={{ margin: 0, fontFamily: 'var(--font-pixel)', fontSize: '0.38rem', color: '#888', letterSpacing: '0.06em', textAlign: 'center', lineHeight: 2 }}>
+                  NO BATTLES<br />YET
+                </p>
               </div>
-              <div style={{ height: '5px', background: 'rgba(0,0,0,0.5)', border: '1px solid #22440a', overflow: 'hidden' }}>
-                <div style={{ height: '100%', width: `${barWidth}%`, background: barWidth >= 50 ? '#58C84A' : barWidth >= 25 ? '#E0C030' : '#E82828', transition: 'width 1s ease-out', boxShadow: `0 0 4px ${barWidth >= 50 ? 'rgba(88,200,74,0.8)' : barWidth >= 25 ? 'rgba(224,192,48,0.8)' : 'rgba(232,40,40,0.8)'}` }} />
-              </div>
-            </div>
+            ) : (
+              leaderboard.slice(0, 8).map((entry, idx) => {
+                const rankColors: Record<number, string> = { 0: '#C9A227', 1: '#9EA0A6', 2: '#A0522D' };
+                const rankBg = rankColors[idx] ?? '#555';
+                const winRatePct = entry.win_rate > 1 ? entry.win_rate : entry.win_rate * 100;
+                const winRateColor = winRatePct >= 100 ? '#C9A227' : winRatePct >= 50 ? '#2e7d32' : '#CC0000';
+                const rowBg = idx % 2 === 0 ? '#f5f5f5' : '#e8f0ff';
+                return (
+                  <div key={entry.trainer} style={{
+                    display: 'flex', alignItems: 'center', gap: '4px',
+                    background: rowBg, borderRadius: '2px',
+                    padding: '2px 4px', minHeight: '20px',
+                  }}>
+                    {/* Rank badge */}
+                    <div style={{
+                      width: '14px', height: '14px', borderRadius: '50%',
+                      background: rankBg, flexShrink: 0,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      <span style={{ fontFamily: 'var(--font-pixel)', fontSize: '0.3rem', color: '#fff', lineHeight: 1 }}>
+                        {entry.rank}
+                      </span>
+                    </div>
+                    {/* Trainer name */}
+                    <span style={{
+                      fontFamily: 'var(--font-body)', fontSize: '0.65rem', color: '#111',
+                      fontWeight: 600, textTransform: 'uppercase', flex: 1,
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      minWidth: 0,
+                    }}>
+                      {entry.trainer}
+                    </span>
+                    {/* W/L */}
+                    <span style={{ fontFamily: 'var(--font-body)', fontSize: '0.58rem', color: '#444', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                      {entry.wins}W {entry.losses}L
+                    </span>
+                    {/* Win rate */}
+                    <span style={{
+                      fontFamily: 'var(--font-body)', fontSize: '0.58rem',
+                      color: winRateColor, fontWeight: 700, whiteSpace: 'nowrap',
+                      flexShrink: 0, minWidth: '34px', textAlign: 'right',
+                    }}>
+                      {winRatePct.toFixed(0)}%
+                    </span>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* Divider + View Full link */}
+          <div style={{ borderTop: '2px solid #1a1c2e', padding: '3px 5px' }}>
+            <Link
+              href="/archive"
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px',
+                fontFamily: 'var(--font-pixel)', fontSize: '0.35rem', color: '#4A90D9',
+                textDecoration: 'none', letterSpacing: '0.06em',
+              }}
+            >
+              VIEW FULL &#9656;
+            </Link>
           </div>
         </div>
 
-        {/* RIGHT: info panel */}
-        <div style={{ width: '140px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          <div style={{ background: 'rgba(0,0,0,0.35)', border: '2px solid rgba(0,0,0,0.4)', borderRadius: '4px', padding: '7px 8px', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)' }}>
-            <p style={{ margin: '0 0 2px', fontFamily: 'var(--font-pixel)', fontSize: '0.35rem', color: 'rgba(255,200,200,0.6)', letterSpacing: '0.06em' }}>NAME:</p>
-            <p style={{ margin: '0 0 6px', fontFamily: 'var(--font-pixel)', fontSize: '0.48rem', color: '#ffffff', letterSpacing: '0.04em', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>DATA ENGINEER</p>
-            <p style={{ margin: '0 0 2px', fontFamily: 'var(--font-pixel)', fontSize: '0.35rem', color: 'rgba(255,200,200,0.6)', letterSpacing: '0.06em' }}>ID No:</p>
-            <p style={{ margin: 0, fontFamily: 'var(--font-pixel)', fontSize: '0.48rem', color: '#ffffff', letterSpacing: '0.04em' }}>{loading ? '—' : idNo}</p>
+        {/* RIGHT PANEL: Trainer info + team + controls */}
+        <div style={{ width: '200px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '6px' }}>
+
+          {/* ── Section A: Trainer info ── */}
+          <div style={{ ...dsPanel, padding: '5px 7px' }}>
+            <p style={{ margin: '0 0 1px', fontFamily: 'var(--font-pixel)', fontSize: '0.32rem', color: '#555', letterSpacing: '0.05em' }}>NAME</p>
+            <p style={{
+              margin: '0 0 1px',
+              fontFamily: 'var(--font-pixel)', fontSize: '0.44rem', color: '#111',
+              letterSpacing: '0.04em',
+              textTransform: 'uppercase', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              maxWidth: '180px',
+            }}>
+              {(trainer?.display_name ?? 'TRAINER').slice(0, 12)}
+            </p>
+            <p style={{ margin: '0 0 3px', fontFamily: 'var(--font-pixel)', fontSize: '0.3rem', color: '#777', letterSpacing: '0.04em' }}>
+              ID: {trainer?.trainer_id ? trainer.trainer_id : (loading ? '—' : idNo)}
+            </p>
+            {trainer?.trainer_title && (
+              <span style={{
+                display: 'inline-block', padding: '0.06rem 0.24rem', borderRadius: '999px',
+                background: '#4A90D922',
+                border: '1px solid #4A90D966',
+                fontFamily: 'var(--font-pixel)', fontSize: '0.26rem',
+                color: '#4A90D9', letterSpacing: '0.05em',
+              }}>
+                {trainer.trainer_title.toUpperCase()}
+              </span>
+            )}
           </div>
-          <div style={{ background: 'rgba(0,0,0,0.3)', border: '2px solid rgba(0,0,0,0.4)', borderRadius: '4px', padding: '8px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-            <div aria-hidden="true" style={{ position: 'relative', width: '44px', height: '44px', flexShrink: 0 }}>
-              <div style={{ position: 'absolute', top: 0, left: '5px', right: '5px', height: '14px', background: '#CC0000', borderRadius: '4px 4px 0 0' }} />
-              <div style={{ position: 'absolute', top: '9px', left: '1px', right: '1px', height: '5px', background: '#880000', borderRadius: '2px' }} />
-              <div style={{ position: 'absolute', top: '13px', left: '8px', right: '8px', height: '18px', background: '#f5c9a0', borderRadius: '40% 40% 35% 35%' }} />
-              <div style={{ position: 'absolute', top: '18px', left: '12px', width: '4px', height: '3px', background: '#2a1a0a', borderRadius: '2px' }} />
-              <div style={{ position: 'absolute', top: '18px', right: '12px', width: '4px', height: '3px', background: '#2a1a0a', borderRadius: '2px' }} />
-              <div style={{ position: 'absolute', bottom: 0, left: '7px', right: '7px', height: '14px', background: '#1a5fa0', borderRadius: '4px 4px 0 0' }} />
+
+          {/* ── Section B: Last team grid ── */}
+          <div style={{ ...dsPanel, padding: '5px' }}>
+            <div style={dsPanelHeader}>
+              <p style={{ margin: 0, fontFamily: 'var(--font-pixel)', fontSize: '0.36rem', color: '#ffffff', letterSpacing: '0.06em' }}>
+                &#9830; LAST TEAM
+              </p>
             </div>
+            {lastTeam && lastTeam.length > 0 ? (
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '2px', marginBottom: '3px' }}>
+                  {lastTeam.slice(0, 6).map((mon, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', aspectRatio: '1', background: '#e8e8e8', borderRadius: '2px', border: '1px solid #ccc' }}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${mon.pokeapi_id}.png`}
+                        alt={mon.name}
+                        width={20}
+                        height={20}
+                        style={{ imageRendering: 'pixelated', objectFit: 'contain', display: 'block' }}
+                        loading="lazy"
+                      />
+                    </div>
+                  ))}
+                  {Array.from({ length: Math.max(0, 6 - lastTeam.length) }).map((_, i) => (
+                    <div key={`empty-${i}`} style={{ aspectRatio: '1', background: '#ddd', borderRadius: '2px', border: '1px solid #bbb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <span style={{ fontFamily: 'var(--font-pixel)', fontSize: '0.35rem', color: '#aaa' }}>?</span>
+                    </div>
+                  ))}
+                </div>
+                {teamReady && (
+                  <p style={{ margin: 0, fontFamily: 'var(--font-pixel)', fontSize: '0.3rem', color: '#2e7d32', letterSpacing: '0.05em' }}>
+                    READY &#9679;
+                  </p>
+                )}
+              </>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '48px', gap: '2px' }}>
+                <p style={{ margin: 0, fontFamily: 'var(--font-pixel)', fontSize: '0.3rem', color: '#888', letterSpacing: '0.05em', textAlign: 'center' }}>
+                  - -
+                </p>
+              </div>
+            )}
           </div>
-          <div style={{ display: 'flex', gap: '5px', justifyContent: 'center' }}>
-            {['#cc2200', '#cc2200', '#cc2200'].map((bg, i) => (
-              <div key={i} aria-hidden="true" style={{ width: '20px', height: '10px', background: bg, borderRadius: '3px', border: '1px solid #880000', boxShadow: 'inset 0 1px 0 rgba(255,100,100,0.3), 0 1px 2px rgba(0,0,0,0.4)' }} />
-            ))}
+
+          {/* ── Section C: Battle controls ── */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', position: 'relative' }}>
+            {/* Launch tooltip */}
+            {showLaunchTip && (
+              <div style={{
+                position: 'absolute', bottom: 'calc(100% + 4px)', left: 0, right: 0,
+                background: '#1a1c2e', border: '2px solid #f5f5f5', borderRadius: '4px',
+                padding: '4px 6px', zIndex: 10,
+              }}>
+                <p style={{ margin: 0, fontFamily: 'var(--font-pixel)', fontSize: '0.3rem', color: '#fff', letterSpacing: '0.05em', textAlign: 'center', lineHeight: 1.7, whiteSpace: 'pre-line' }}>
+                  {'TEAM COPIED!\nPASTE IN SHOWDOWN'}
+                </p>
+              </div>
+            )}
+            {/* Copy tooltip */}
+            {showCopyTip && (
+              <div style={{
+                position: 'absolute', bottom: 'calc(100% + 4px)', left: 0, right: 0,
+                background: '#1a1c2e', border: '2px solid #f5f5f5', borderRadius: '4px',
+                padding: '4px 6px', zIndex: 10,
+              }}>
+                <p style={{ margin: 0, fontFamily: 'var(--font-pixel)', fontSize: '0.3rem', color: '#fff', letterSpacing: '0.05em', textAlign: 'center' }}>
+                  COPIED!
+                </p>
+              </div>
+            )}
+
+            {/* LAUNCH BATTLE button */}
+            <button
+              onClick={() => { void handleLaunchBattle(); }}
+              style={{
+                width: '100%',
+                background: '#CC0000',
+                border: '2px solid #1a1c2e',
+                borderRadius: '4px',
+                color: '#fff',
+                fontFamily: 'var(--font-pixel)',
+                fontSize: '0.36rem',
+                letterSpacing: '0.08em',
+                padding: '0.35rem 0.4rem',
+                cursor: 'pointer',
+                textTransform: 'uppercase',
+                textAlign: 'center',
+                boxShadow: 'inset 1px 1px 0 rgba(255,255,255,0.2)',
+              }}
+              onFocus={e => { e.currentTarget.style.outline = '2px solid #4A90D9'; e.currentTarget.style.outlineOffset = '2px'; }}
+              onBlur={e => { e.currentTarget.style.outline = ''; e.currentTarget.style.outlineOffset = ''; }}
+            >
+              &#9658; LAUNCH BATTLE
+            </button>
+
+            {/* COPY TEAM button */}
+            <button
+              onClick={() => { void handleCopyTeam(); }}
+              style={{
+                width: '100%',
+                background: '#f5f5f5',
+                border: '2px solid #1a1c2e',
+                borderRadius: '4px',
+                color: '#1a1c2e',
+                fontFamily: 'var(--font-pixel)',
+                fontSize: '0.32rem',
+                letterSpacing: '0.06em',
+                padding: '0.25rem 0.4rem',
+                cursor: 'pointer',
+                textTransform: 'uppercase',
+                textAlign: 'center',
+                boxShadow: 'inset 1px 1px 0 rgba(255,255,255,0.8), inset -1px -1px 0 rgba(0,0,0,0.12)',
+              }}
+              onFocus={e => { e.currentTarget.style.outline = '2px solid #4A90D9'; e.currentTarget.style.outlineOffset = '2px'; }}
+              onBlur={e => { e.currentTarget.style.outline = ''; e.currentTarget.style.outlineOffset = ''; }}
+            >
+              &#9670; COPY TEAM
+            </button>
           </div>
-          <div style={{ display: 'flex', gap: '2px', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
+
+          {/* ── Section D: Star rating ── */}
+          <div style={{ display: 'flex', gap: '2px', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', marginTop: '1px' }}>
             {[1, 2, 3, 4, 5].map((n) => (
               <svg key={n} width="11" height="11" viewBox="0 0 14 14" aria-hidden="true">
-                <polygon points="7,1 8.8,5.2 13.3,5.7 10.1,8.7 11,13.2 7,10.9 3,13.2 3.9,8.7 0.7,5.7 5.2,5.2" fill={n <= stars ? '#F8D030' : 'rgba(255,255,255,0.18)'} stroke={n <= stars ? '#B8A038' : 'rgba(0,0,0,0.2)'} strokeWidth="0.8" />
+                <polygon points="7,1 8.8,5.2 13.3,5.7 10.1,8.7 11,13.2 7,10.9 3,13.2 3.9,8.7 0.7,5.7 5.2,5.2" fill={n <= stars ? '#F8D030' : '#cccccc'} stroke={n <= stars ? '#B8A038' : '#aaaaaa'} strokeWidth="0.8" />
               </svg>
             ))}
           </div>
-          <p style={{ margin: 0, fontFamily: 'var(--font-pixel)', fontSize: '0.32rem', color: 'rgba(255,200,200,0.5)', textAlign: 'center', letterSpacing: '0.05em' }}>TRAINER RANK</p>
+          <p style={{ margin: 0, fontFamily: 'var(--font-pixel)', fontSize: '0.3rem', color: 'rgba(255,255,255,0.45)', textAlign: 'center', letterSpacing: '0.05em' }}>TRAINER RANK</p>
         </div>
       </div>
     </div>
@@ -269,21 +516,53 @@ export default function DashboardPage() {
   const [recentBattles, setRecentBattles] = useState<PredictionWithResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [trainer, setTrainer] = useState<TrainerProfile | null>(null);
+  const [lastTeam, setLastTeam] = useState<Array<{ name: string; pokeapi_id: number }> | null>(null);
+  const [leaderboard, setLeaderboard] = useState<import('@/types').LeaderboardEntry[] | null>(null);
+
+  useEffect(() => {
+    setTrainer(getTrainerProfile());
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
       try {
-        const [allPokemon, assigned, metricsData, history] = await Promise.allSettled([
-          api.getPokemon(), api.getAssignedPokemon(), api.getAccuracyMetrics(), api.getBattleHistory(),
+        const [allPokemon, assigned, metricsData, history, lbData] = await Promise.allSettled([
+          api.getPokemon(), api.getAssignedPokemon(), api.getAccuracyMetrics(), api.getBattleHistory(), api.getLeaderboard(),
         ]);
         if (cancelled) return;
-        if (allPokemon.status === 'fulfilled') setTotalPokemon(allPokemon.value.length);
+
+        let pokemonList: import('@/types').Pokemon[] = [];
+        if (allPokemon.status === 'fulfilled') {
+          pokemonList = allPokemon.value;
+          setTotalPokemon(pokemonList.length);
+        }
         if (assigned.status === 'fulfilled') setAssignedPokemon(assigned.value.length);
         if (metricsData.status === 'fulfilled') setMetrics(metricsData.value);
         if (history.status === 'fulfilled') {
           const sorted = [...history.value].sort((a, b) => new Date(b.predicted_at).getTime() - new Date(a.predicted_at).getTime());
           setRecentBattles(sorted.slice(0, 5));
+        }
+        if (lbData.status === 'fulfilled') setLeaderboard(lbData.value);
+        else setLeaderboard([]);
+
+        // Load last generated team if pokemon data is available
+        if (pokemonList.length > 0) {
+          try {
+            const exportData = await api.getShowdownExport();
+            if (!cancelled && exportData.team_names && exportData.team_names.length > 0) {
+              const mapped = exportData.team_names
+                .map((teamName: string) => {
+                  const found = pokemonList.find(p => p.name === teamName);
+                  return found ? { name: found.name, pokeapi_id: found.pokeapi_id } : null;
+                })
+                .filter((entry): entry is { name: string; pokeapi_id: number } => entry !== null);
+              setLastTeam(mapped.length > 0 ? mapped : null);
+            }
+          } catch {
+            // showdown export may 404 if no team generated yet — silently ignore
+          }
         }
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load dashboard');
@@ -309,6 +588,9 @@ export default function DashboardPage() {
           totalBattles={metrics?.total_battles ?? null}
           accuracy={metrics?.accuracy ?? null}
           loading={loading}
+          trainer={trainer}
+          lastTeam={lastTeam}
+          leaderboard={leaderboard}
         />
 
         {/* Battle Station */}

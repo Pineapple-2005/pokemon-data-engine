@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { Pokemon } from '../common/interfaces/pokemon.interface';
+import { parseShowdownTeam } from './showdown.parser';
 
 export interface PokemonFilterParams {
   role?: string;
@@ -51,5 +52,26 @@ export class PokemonService {
 
   async unassignFromUser(userId: string, pokemonId: number): Promise<void> {
     return this.db.unassignPokemonFromUser(userId, pokemonId);
+  }
+
+  /**
+   * Parses a Pokémon Showdown export string, looks each name up in the DB,
+   * and returns which were found and which were not.
+   */
+  async importTeam(showdownText: string): Promise<{ found: Pokemon[]; not_found: string[] }> {
+    const names = parseShowdownTeam(showdownText);
+    const found: Pokemon[] = [];
+    const not_found: string[] = [];
+
+    for (const name of names) {
+      const pokemon = await this.db.findPokemonByName(name);
+      if (pokemon) {
+        found.push(pokemon);
+      } else {
+        not_found.push(name);
+      }
+    }
+
+    return { found, not_found };
   }
 }

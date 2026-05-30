@@ -3,6 +3,7 @@ import { DatabaseService } from '../database/database.service';
 import { MlClientService, Engine1Response } from '../ml/ml-client.service';
 import { AuditService } from '../audit/audit.service';
 import type { EngineOutput } from '../common/interfaces/pokemon.interface';
+import { formatShowdownTeam } from '../pokemon/showdown.parser';
 
 export interface GenerateTeamParams {
   theme: string;
@@ -106,30 +107,8 @@ export class Engine1Service {
       });
     }
 
-    const theme = parsed.theme ?? 'Unknown';
-    const difficulty = parsed.difficulty ?? 'unknown';
     const team = Array.isArray(parsed.team) ? parsed.team : [];
-
-    const lines: string[] = [
-      `=== ${theme} Gym Leader Team (${difficulty}) ===`,
-      '',
-    ];
-
-    for (const slot of team) {
-      const typeLine = slot.type_2
-        ? `${slot.type_1} / ${slot.type_2}`
-        : slot.type_1 ?? 'Unknown';
-
-      lines.push(
-        `${slot.name}`,
-        `Type: ${typeLine}`,
-        `Role: ${slot.role}`,
-        `- (moves not assigned — use Showdown teambuilder)`,
-        '',
-      );
-    }
-
-    return lines.join('\n');
+    return formatShowdownTeam(team, parsed.theme, parsed.difficulty);
   }
 
   private async resolveEngineOutput(matchId?: number): Promise<EngineOutput> {

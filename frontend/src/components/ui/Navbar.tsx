@@ -4,17 +4,24 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { GuideModal } from './GuideModal';
-import { getStoredUser, clearUser } from '@/lib/auth';
+import { getStoredUser, clearUser, getTrainerProfile } from '@/lib/auth';
+import type { TrainerProfile } from '@/types';
 
 /* Each entry gets a Pokédex number and Pokémon sprite for visual authenticity */
 const NAV_ITEMS = [
-  { href: '/',         label: 'Dashboard',       number: '01', spriteId: 25  }, // Pikachu
-  { href: '/pokemon',  label: 'Pokémon DB',       number: '02', spriteId: 1   }, // Bulbasaur
-  { href: '/engine1',  label: 'Gym Team Builder', number: '03', spriteId: 6   }, // Charizard
-  { href: '/engine2',  label: 'Counter Pick',     number: '04', spriteId: 131 }, // Lapras
-  { href: '/engine3',  label: 'Battle Predictor', number: '05', spriteId: 150 }, // Mewtwo
-  { href: '/history',  label: 'Battle History',   number: '06', spriteId: 143 }, // Snorlax
-  { href: '/metrics',  label: 'Model Metrics',    number: '07', spriteId: 137 }, // Porygon
+  { href: '/',          label: 'Dashboard',       number: '01', spriteId: 25  }, // Pikachu
+  { href: '/pokemon',   label: 'Pokémon DB',       number: '02', spriteId: 1   }, // Bulbasaur
+  { href: '/engine1',   label: 'Gym Team Builder', number: '03', spriteId: 6   }, // Charizard
+  { href: '/engine2',   label: 'Counter Pick',     number: '04', spriteId: 131 }, // Lapras
+  { href: '/engine3',   label: 'Battle Predictor', number: '05', spriteId: 150 }, // Mewtwo
+  { href: '/history',   label: 'Battle History',   number: '06', spriteId: 143 }, // Snorlax
+  { href: '/metrics',   label: 'Model Metrics',    number: '07', spriteId: 137 }, // Porygon
+  { href: '/archive',   label: 'The Archive',      number: '08', spriteId: 52  }, // Meowth
+  { href: '/engine5',   label: 'Commentator',      number: '09', spriteId: 54  }, // Psyduck
+  { href: '/engine6',   label: 'Pokedex AI',       number: '10', spriteId: 10  }, // Caterpie (Oak's lab)
+  { href: '/engine7',   label: 'Exporter',         number: '11', spriteId: 132 }, // Ditto
+  { href: '/engine9',   label: 'Team Scanner',     number: '12', spriteId: 81  }, // Magnemite
+  { href: '/engine10',  label: 'Replay Viewer',    number: '13', spriteId: 54  }, // Psyduck
 ];
 
 const SPRITE_BASE = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon';
@@ -24,10 +31,12 @@ export function Navbar() {
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
   const [username, setUsername] = useState<string | null>(null);
+  const [trainerProfile, setTrainerProfile] = useState<TrainerProfile | null>(null);
 
   useEffect(() => {
     setUsername(getStoredUser()?.username ?? null);
-  }, []);
+    setTrainerProfile(getTrainerProfile());
+  }, [pathname]);
 
   function handleLogout() {
     clearUser();
@@ -143,7 +152,7 @@ export function Navbar() {
         overflowY: 'auto',
       }}>
         {NAV_ITEMS.map(({ href, label, number, spriteId }) => {
-          const active = href === '/' ? pathname === '/' : pathname.startsWith(href);
+          const active = href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(href + '/');
 
           return (
             <li key={href}>
@@ -273,29 +282,79 @@ export function Navbar() {
                 <span aria-hidden="true">⏏</span>
               </button>
             ) : (
-              /* Expanded: username + LOG OUT button */
+              /* Expanded: mini trainer card row + LOG OUT */
               <div style={{
                 padding: '0.5rem 0.625rem',
                 borderRadius: '0.375rem',
                 background: 'rgba(0,0,0,0.3)',
                 border: '1px solid rgba(255,255,255,0.07)',
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.375rem' }}>
-                  <span style={{ fontSize: '0.65rem' }} aria-hidden="true">👤</span>
-                  <p style={{
-                    margin: 0,
-                    fontFamily: 'var(--font-pixel)',
-                    fontSize: '0.46rem',
-                    color: 'var(--pk-gold)',
-                    letterSpacing: '0.06em',
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    flex: 1,
-                  }}>
-                    {username}
-                  </p>
-                </div>
+                {/* Profile button — mini trainer card row */}
+                <button
+                  onClick={() => router.push('/profile')}
+                  style={{
+                    width: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: '0 0 0.375rem',
+                    textAlign: 'left',
+                  }}
+                  aria-label={`View profile for ${username}`}
+                >
+                  {trainerProfile?.trainer_class ? (
+                    /* Trainer sprite when profile is loaded */
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={`https://play.pokemonshowdown.com/sprites/trainers/${trainerProfile.trainer_class}.png`}
+                      alt=""
+                      width={28}
+                      height={28}
+                      style={{ imageRendering: 'pixelated', objectFit: 'contain', flexShrink: 0 }}
+                    />
+                  ) : (
+                    /* Fallback icon for old sessions */
+                    <span style={{ fontSize: '0.65rem', flexShrink: 0 }} aria-hidden="true">👤</span>
+                  )}
+
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <p style={{
+                      margin: 0,
+                      fontFamily: 'var(--font-pixel)',
+                      fontSize: '0.46rem',
+                      color: 'var(--pk-gold)',
+                      letterSpacing: '0.06em',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}>
+                      {trainerProfile?.display_name ?? username}
+                    </p>
+
+                    {/* Title badge */}
+                    {trainerProfile?.trainer_title && (
+                      <span style={{
+                        display: 'inline-block',
+                        marginTop: '0.2rem',
+                        padding: '0.1rem 0.35rem',
+                        borderRadius: '999px',
+                        background: `${trainerProfile.trainer_card_color ?? '#EF4444'}22`,
+                        border: `1px solid ${trainerProfile.trainer_card_color ?? '#EF4444'}55`,
+                        fontFamily: 'var(--font-pixel)',
+                        fontSize: '0.32rem',
+                        color: trainerProfile.trainer_card_color ?? '#EF4444',
+                        letterSpacing: '0.06em',
+                        whiteSpace: 'nowrap',
+                      }}>
+                        {trainerProfile.trainer_title.toUpperCase()}
+                      </span>
+                    )}
+                  </div>
+                </button>
+
                 <button
                   onClick={handleLogout}
                   style={{

@@ -117,3 +117,81 @@ export interface AuditEntry {
   new_value: string;
   timestamp: string;
 }
+
+// Engine 4 — Archive
+export interface LeaderboardEntry {
+  rank: number;
+  trainer: string;
+  wins: number;
+  losses: number;
+  win_rate: number;
+  total_battles: number;
+  avg_confidence: number;
+}
+
+export interface ArchiveStats {
+  total_battles: number;
+  most_used_pokemon: string;
+  most_accurate_model: string;
+  overall_accuracy: number;
+}
+
+// Engine 5 — Commentator
+export interface CommentaryResponse {
+  match_id: string;
+  commentary: string;
+  model: string;
+}
+
+// Engine 6 — Pokedex AI
+export interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  sources?: string[];
+}
+
+export interface ChatResponse {
+  answer: string;
+  sources: string[];
+}
+
+// Engine 9 — Scanner
+export interface WeaknessEntry {
+  type: string;
+  avg_multiplier: number;
+  classification: 'weak' | 'neutral' | 'resist';
+  defending_types: Array<{ name: string; multiplier: number }>;
+}
+
+export interface ScanResult {
+  team: Array<{ name: string; found: boolean }>;
+  weakness_profile: WeaknessEntry[];
+  offensive_coverage: string[];
+  uncovered_types: string[];
+  recommended_cover: string[];
+}
+
+// Engine 10 — Replay
+export interface ReplayEvent {
+  turn: number;
+  type: 'move' | 'switch' | 'damage' | 'heal' | 'faint' | 'turn' | 'win';
+  player?: 'p1' | 'p2';
+  pokemon?: string;
+  detail?: string;
+}
+
+// Trainer profile
+export interface TrainerProfile {
+  id: string;
+  username: string;
+  display_name: string;
+  section: string;
+  trainer_class: string;
+  trainer_card_color: string;
+  starter_pokemon: string;
+  hometown: string;
+  favorite_type: string;
+  trainer_title: string;
+  rival_name: string;
+  trainer_id: string;
+}

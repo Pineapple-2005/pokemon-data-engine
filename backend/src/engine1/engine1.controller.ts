@@ -15,6 +15,7 @@ import { IsString, IsNotEmpty, IsIn, IsOptional } from 'class-validator';
 import { Engine1Service } from './engine1.service';
 import { Engine1Response } from '../ml/ml-client.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { parseShowdownTeam } from '../pokemon/showdown.parser';
 
 class GenerateTeamDto {
   @IsString()
@@ -80,6 +81,36 @@ export class Engine1Controller {
     const id = matchId === undefined ? undefined : Number.parseInt(matchId, 10);
     try {
       return await this.engine1Service.getShowdownExport(id);
+    } catch (err) {
+      if (err instanceof HttpException) throw err;
+      throw new HttpException(
+        { success: false, error: (err as Error).message },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
+   * GET /api/engine1/showdown-export-json?match_id=<engine_id>
+   * Returns the PS-format team text alongside parsed team names and a link
+   * to the Pokémon Showdown teambuilder.
+   */
+  @Get('showdown-export-json')
+  async showdownExportJson(
+    @Query('match_id') matchId?: string,
+  ): Promise<{ success: true; data: { text: string; team_names: string[]; ps_link: string } }> {
+    const id = matchId === undefined ? undefined : Number.parseInt(matchId, 10);
+    try {
+      const text = await this.engine1Service.getShowdownExport(id);
+      const team_names = parseShowdownTeam(text);
+      return {
+        success: true,
+        data: {
+          text,
+          team_names,
+          ps_link: 'https://play.pokemonshowdown.com/teambuilder',
+        },
+      };
     } catch (err) {
       if (err instanceof HttpException) throw err;
       throw new HttpException(

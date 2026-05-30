@@ -6,6 +6,8 @@ import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { CounterScoreBar } from '@/components/engines/CounterScoreBar';
 import { MatchupTable } from '@/components/engines/MatchupTable';
 import { AuthGuard } from '@/components/ui/AuthGuard';
+import { ShowdownImportModal } from '@/components/ui/ShowdownImportModal';
+import { PokemonAutocomplete } from '@/components/ui/PokemonAutocomplete';
 import { api } from '@/lib/api';
 import type { Engine2Response } from '@/types';
 
@@ -65,14 +67,12 @@ function PokemonSlotInput({ index, value, onChange }: { readonly index: number; 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
       <span className="pk-slot-number">{index + 1}</span>
-      <input
-        type="text"
+      <PokemonAutocomplete
+        id={`e2-slot-${index}`}
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={onChange}
+        onSelect={(pokemon) => onChange(pokemon.name)}
         placeholder={`Pokémon ${index + 1}`}
-        className="pk-input"
-        style={{ fontSize: '16px' }}
-        aria-label={`Opponent Pokémon slot ${index + 1}`}
       />
     </div>
   );
@@ -86,9 +86,16 @@ export default function Engine2Page() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<Engine2Response | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [importModalOpen, setImportModalOpen] = useState(false);
 
   function updateSlot(i: number, val: string) {
     setOpponentSlots((prev) => { const next = [...prev]; next[i] = val; return next; });
+  }
+
+  function handleTeamImported(teamNames: string[]) {
+    const next = ['', '', '', '', '', ''];
+    teamNames.slice(0, 6).forEach((name, i) => { next[i] = name; });
+    setOpponentSlots(next);
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -248,13 +255,45 @@ export default function Engine2Page() {
               </div>
             </div>
 
-            {/* Label */}
-            <p className="pk-section-label">
-              <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
-                <polygon points="5,0 6.2,3.5 10,3.5 7,5.8 8.1,9 5,7 1.9,9 3,5.8 0,3.5 3.8,3.5" fill="currentColor" opacity="0.7"/>
-              </svg>
-              OPPONENT TEAM ROSTER
-            </p>
+            {/* Label + Import button row */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.5rem' }}>
+              <p className="pk-section-label" style={{ margin: 0 }}>
+                <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
+                  <polygon points="5,0 6.2,3.5 10,3.5 7,5.8 8.1,9 5,7 1.9,9 3,5.8 0,3.5 3.8,3.5" fill="currentColor" opacity="0.7"/>
+                </svg>
+                OPPONENT TEAM ROSTER
+              </p>
+              <button
+                type="button"
+                onClick={() => setImportModalOpen(true)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                  background: 'transparent',
+                  border: '1px solid rgba(104,144,240,0.4)',
+                  borderRadius: '0.4rem',
+                  color: '#6890F0',
+                  fontFamily: 'var(--font-pixel)',
+                  fontSize: '0.42rem',
+                  letterSpacing: '0.06em',
+                  padding: '0.35rem 0.75rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  whiteSpace: 'nowrap',
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.background = 'rgba(104,144,240,0.08)';
+                  (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(104,144,240,0.7)';
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.background = 'transparent';
+                  (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(104,144,240,0.4)';
+                }}
+              >
+                📥 IMPORT FROM SHOWDOWN
+              </button>
+            </div>
 
             {/* Slot grid */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.625rem', marginBottom: '1.25rem' }}>
@@ -412,6 +451,12 @@ export default function Engine2Page() {
         </div>
       )}
     </div>
+
+    <ShowdownImportModal
+      isOpen={importModalOpen}
+      onClose={() => setImportModalOpen(false)}
+      onTeamImported={handleTeamImported}
+    />
     </AuthGuard>
   );
 }

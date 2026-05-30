@@ -10,6 +10,11 @@ import { Engine2Module } from './engine2/engine2.module';
 import { Engine3Module } from './engine3/engine3.module';
 import { AuditModule } from './audit/audit.module';
 import { AuthModule } from './auth/auth.module';
+import { ReplayModule } from './replay/replay.module';
+import { ArchiveModule } from './archive/archive.module';
+import { Engine5Module } from './engine5/engine5.module';
+import { Engine6Module } from './engine6/engine6.module';
+import { Engine9Module } from './engine9/engine9.module';
 
 @Module({
   imports: [
@@ -32,6 +37,11 @@ import { AuthModule } from './auth/auth.module';
     Engine3Module,
     AuditModule,
     AuthModule,
+    ReplayModule,
+    ArchiveModule,
+    Engine5Module,
+    Engine6Module,
+    Engine9Module,
   ],
 })
 export class AppModule {}

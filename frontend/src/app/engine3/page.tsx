@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { PredictionResult } from '@/components/engines/PredictionResult';
 import { AuthGuard } from '@/components/ui/AuthGuard';
+import { PokemonAutocomplete } from '@/components/ui/PokemonAutocomplete';
 import { api } from '@/lib/api';
 import type { Engine3Response } from '@/types';
 
@@ -62,151 +63,24 @@ const GEN1_POKEMON = [
   {id:151,name:'mew'},
 ] as const;
 
-/* ── Pokémon slot input with autocomplete ───────────────── */
+/* ── Pokémon slot input — delegates to shared PokemonAutocomplete ── */
 interface PokemonSlotInputProps {
   value: string;
   onChange: (v: string) => void;
   slotNumber: number;
+  /** accent color — retained for API compatibility with TeamInput callers */
   accent: string;
   label: string;
 }
 
-function PokemonSlotInput({ value, onChange, slotNumber, accent, label }: PokemonSlotInputProps) {
-  const [focused, setFocused] = useState(false);
-  const [highlightedIndex, setHighlightedIndex] = useState(-1);
-  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const query = value.trim().toLowerCase();
-  const suggestions = focused && query.length >= 1
-    ? GEN1_POKEMON.filter((p) => p.name.includes(query)).slice(0, 8)
-    : [];
-  const showDropdown = focused && suggestions.length > 0;
-
-  function handleSelect(name: string) {
-    onChange(name);
-    setFocused(false);
-    setHighlightedIndex(-1);
-  }
-
-  function handleBlur() {
-    closeTimerRef.current = setTimeout(() => {
-      setFocused(false);
-      setHighlightedIndex(-1);
-    }, 150);
-  }
-
-  function handleFocus() {
-    if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
-    setFocused(true);
-  }
-
-  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (!showDropdown) return;
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      setHighlightedIndex((prev) => Math.min(prev + 1, suggestions.length - 1));
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      setHighlightedIndex((prev) => Math.max(prev - 1, 0));
-    } else if (e.key === 'Enter' && highlightedIndex >= 0) {
-      e.preventDefault();
-      handleSelect(suggestions[highlightedIndex].name);
-    } else if (e.key === 'Escape') {
-      setFocused(false);
-      setHighlightedIndex(-1);
-    }
-  }
-
-  // Reset highlighted index when suggestions change
-  useEffect(() => {
-    setHighlightedIndex(-1);
-  }, [query]);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
-    };
-  }, []);
-
+function PokemonSlotInput({ value, onChange, slotNumber }: PokemonSlotInputProps) {
   return (
-    <div style={{ position: 'relative', flex: 1 }}>
-      <input
-        type="text"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onFocus={handleFocus}
-        onBlur={handleBlur}
-        onKeyDown={handleKeyDown}
-        placeholder={`Pokémon ${slotNumber}`}
-        className="pk-input"
-        style={{ fontSize: '16px', width: '100%' }}
-        aria-label={label}
-        aria-autocomplete="list"
-        aria-expanded={showDropdown}
-        autoComplete="off"
-      />
-      {showDropdown && (
-        <div
-          role="listbox"
-          aria-label={`${label} suggestions`}
-          style={{
-            position: 'absolute',
-            top: '100%',
-            left: 0,
-            right: 0,
-            zIndex: 100,
-            background: '#0d1120',
-            border: `1px solid ${accent}44`,
-            borderRadius: '0 0 0.5rem 0.5rem',
-            boxShadow: `0 8px 24px rgba(0,0,0,0.6), 0 0 12px ${accent}22`,
-            overflow: 'hidden',
-            marginTop: '2px',
-          }}
-        >
-          {suggestions.map((pokemon, idx) => {
-            const isHighlighted = idx === highlightedIndex;
-            return (
-              <div
-                key={pokemon.id}
-                role="option"
-                aria-selected={isHighlighted}
-                onMouseDown={() => {
-                  // mousedown fires before blur — cancel the close timer
-                  if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
-                  handleSelect(pokemon.name);
-                }}
-                onMouseEnter={() => setHighlightedIndex(idx)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  padding: '0.4rem 0.625rem',
-                  cursor: 'pointer',
-                  fontSize: '0.8rem',
-                  color: 'var(--pk-text)',
-                  textTransform: 'capitalize',
-                  background: isHighlighted ? `${accent}18` : 'transparent',
-                  borderLeft: isHighlighted ? `2px solid ${accent}` : '2px solid transparent',
-                  transition: 'background 0.1s ease',
-                }}
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${pokemon.id}.png`}
-                  alt=""
-                  aria-hidden="true"
-                  width={24}
-                  height={24}
-                  style={{ imageRendering: 'pixelated', flexShrink: 0 }}
-                />
-                {pokemon.name}
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
+    <PokemonAutocomplete
+      value={value}
+      onChange={onChange}
+      onSelect={(pokemon) => onChange(pokemon.name)}
+      placeholder={`Pokémon ${slotNumber}`}
+    />
   );
 }
 

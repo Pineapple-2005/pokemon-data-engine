@@ -165,25 +165,32 @@ export default function Engine1Page() {
   const [result, setResult] = useState<Engine1Response | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showCopied, setShowCopied] = useState(false);
+  const [showOpenTip, setShowOpenTip] = useState(false);
 
-  function handleShowdownExport() {
+  const ROLE_MOVES: Record<string, [string, string, string, string]> = {
+    sweeper:  ['Hyper Beam',   'Body Slam',    'Earthquake',   'Swords Dance'],
+    tank:     ['Body Slam',    'Earthquake',   'Rock Slide',   'Rest'],
+    wall:     ['Rest',         'Toxic',        'Thunder Wave', 'Body Slam'],
+    support:  ['Thunder Wave', 'Soft-Boiled',  'Seismic Toss', 'Rest'],
+    balanced: ['Body Slam',    'Earthquake',   'Ice Beam',     'Thunderbolt'],
+    ace:      ['Body Slam',    'Earthquake',   'Ice Beam',     'Thunderbolt'],
+  };
+
+  async function handleShowdownExport() {
     if (!result) return;
-    const lines: string[] = [
-      `=== ${result.theme.toUpperCase()} GYM LEADER TEAM (${result.difficulty.toUpperCase()}) ===`,
-      '',
-    ];
-    for (const slot of result.team) {
-      lines.push(`${slot.name.charAt(0).toUpperCase() + slot.name.slice(1)} (Native Region: ${slot.native_region ?? 'Kanto'})`);
-      lines.push(`Type: ${slot.type_2 ? `${slot.type_1}/${slot.type_2}` : slot.type_1} | Role: ${slot.role} | BST: ${slot.total_base_stats}`);
-      lines.push('');
-    }
-    lines.push('Note: Import each Pokémon manually in Pokémon Showdown teambuilder.');
-    lines.push('Restricted Pokémon (Legendary/Mythical) have been excluded.');
-    const text = lines.join('\n');
-    void navigator.clipboard.writeText(text).then(() => {
-      setShowCopied(true);
-      setTimeout(() => setShowCopied(false), 2000);
+    const blocks = result.team.map((slot) => {
+      const name = slot.name.charAt(0).toUpperCase() + slot.name.slice(1);
+      const moves = ROLE_MOVES[slot.role.toLowerCase()] ?? ['Body Slam', 'Earthquake', 'Ice Beam', 'Thunderbolt'];
+      return [name, `- ${moves[0]}`, `- ${moves[1]}`, `- ${moves[2]}`, `- ${moves[3]}`].join('\n');
     });
+    const text = blocks.join('\n\n');
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      // clipboard unavailable — continue anyway
+    }
+    setShowCopied(true);
+    setTimeout(() => setShowCopied(false), 2000);
   }
 
   const tc = TYPE_COLORS[theme] ?? TYPE_COLORS['Balanced'];
@@ -694,45 +701,108 @@ export default function Engine1Page() {
               <span style={{ fontSize: '0.9rem', opacity: 0.7 }}>▶</span>
             </button>
 
-            {/* Showdown export button */}
-            <div style={{ position: 'relative' }}>
-              <button
-                type="button"
-                onClick={handleShowdownExport}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: '0.5rem',
-                  background: 'transparent',
-                  border: '2px solid rgba(120,200,80,0.5)',
-                  borderRadius: '0.625rem',
-                  color: '#78C850',
-                  fontFamily: 'var(--font-pixel)',
-                  fontSize: '0.55rem',
-                  letterSpacing: '0.08em',
-                  padding: '0.75rem 1.5rem',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease',
-                }}
-              >
-                📋 EXPORT FOR SHOWDOWN
-              </button>
-              {showCopied && (
-                <div style={{
-                  position: 'absolute', bottom: 'calc(100% + 0.4rem)', left: '50%',
-                  transform: 'translateX(-50%)',
-                  background: '#0d1120',
-                  border: '1px solid rgba(120,200,80,0.5)',
-                  borderRadius: '0.35rem',
-                  padding: '0.25rem 0.6rem',
-                  fontSize: '0.42rem',
-                  fontFamily: 'var(--font-pixel)',
-                  color: '#78C850',
-                  letterSpacing: '0.06em',
-                  whiteSpace: 'nowrap',
-                  pointerEvents: 'none',
-                }}>
-                  COPIED!
-                </div>
-              )}
+            {/* Showdown export button + open link */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+              <div style={{ position: 'relative' }}>
+                <button
+                  type="button"
+                  onClick={() => { void handleShowdownExport(); }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '0.5rem',
+                    background: 'transparent',
+                    border: '2px solid rgba(120,200,80,0.5)',
+                    borderRadius: '0.625rem',
+                    color: '#78C850',
+                    fontFamily: 'var(--font-pixel)',
+                    fontSize: '0.55rem',
+                    letterSpacing: '0.08em',
+                    padding: '0.75rem 1.5rem',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                  }}
+                >
+                  📋 EXPORT FOR SHOWDOWN
+                </button>
+                {showCopied && (
+                  <div style={{
+                    position: 'absolute', bottom: 'calc(100% + 0.4rem)', left: '50%',
+                    transform: 'translateX(-50%)',
+                    background: '#0d1120',
+                    border: '1px solid rgba(120,200,80,0.5)',
+                    borderRadius: '0.35rem',
+                    padding: '0.25rem 0.6rem',
+                    fontSize: '0.42rem',
+                    fontFamily: 'var(--font-pixel)',
+                    color: '#78C850',
+                    letterSpacing: '0.06em',
+                    whiteSpace: 'nowrap',
+                    pointerEvents: 'none',
+                  }}>
+                    COPIED!
+                  </div>
+                )}
+              </div>
+              <div style={{ position: 'relative' }}>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (result) {
+                      const blocks = result.team.map((slot) => {
+                        const name = slot.name.charAt(0).toUpperCase() + slot.name.slice(1);
+                        const moves = ROLE_MOVES[slot.role.toLowerCase()] ?? ['Body Slam', 'Earthquake', 'Ice Beam', 'Thunderbolt'];
+                        return [name, `- ${moves[0]}`, `- ${moves[1]}`, `- ${moves[2]}`, `- ${moves[3]}`].join('\n');
+                      });
+                      try { await navigator.clipboard.writeText(blocks.join('\n\n')); } catch { /* ignore */ }
+                    }
+                    window.open('https://play.pokemonshowdown.com/teambuilder', '_blank', 'noopener,noreferrer');
+                    setShowOpenTip(true);
+                    setTimeout(() => setShowOpenTip(false), 5000);
+                  }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '0.3rem',
+                    background: 'transparent',
+                    border: 'none',
+                    color: 'rgba(120,200,80,0.6)',
+                    fontFamily: 'var(--font-pixel)',
+                    fontSize: '0.45rem',
+                    letterSpacing: '0.06em',
+                    cursor: 'pointer',
+                    borderBottom: '1px solid rgba(120,200,80,0.3)',
+                    paddingBottom: '1px',
+                    padding: '0',
+                    transition: 'color 0.15s ease',
+                  }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = '#78C850'; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'rgba(120,200,80,0.6)'; }}
+                >
+                  Open in Showdown ↗
+                </button>
+                {showOpenTip && (
+                  <div style={{
+                    position: 'absolute', bottom: 'calc(100% + 0.5rem)', left: '50%',
+                    transform: 'translateX(-50%)',
+                    background: '#0d1120',
+                    border: '1px solid rgba(120,200,80,0.5)',
+                    borderRadius: '0.4rem',
+                    padding: '0.4rem 0.75rem',
+                    fontSize: '0.4rem',
+                    fontFamily: 'var(--font-pixel)',
+                    color: '#78C850',
+                    letterSpacing: '0.05em',
+                    whiteSpace: 'nowrap',
+                    pointerEvents: 'none',
+                    zIndex: 10,
+                    lineHeight: 1.6,
+                    textAlign: 'center',
+                    boxShadow: '0 0 12px rgba(120,200,80,0.2)',
+                  }}>
+                    Team copied!<br />
+                    In Showdown: click<br />
+                    <span style={{ color: '#F8D030' }}>"Import from text or URL"</span><br />
+                    and paste.
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
