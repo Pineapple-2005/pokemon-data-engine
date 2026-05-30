@@ -6,7 +6,7 @@ import dynamic from 'next/dynamic';
 import { StatCard } from '@/components/ui/StatCard';
 import { ProfessorOak } from '@/components/ui/ProfessorOak';
 import { api } from '@/lib/api';
-import { getTrainerProfile } from '@/lib/auth';
+import { getTrainerProfile, getStoredUser, clearUser } from '@/lib/auth';
 import type { PredictionWithResult, ModelMetrics, TrainerProfile } from '@/types';
 
 const Pokeball3D = dynamic(() => import('@/components/ui/Pokeball3D').then(m => ({ default: m.Pokeball3D })), { ssr: false });
@@ -528,9 +528,14 @@ export default function DashboardPage() {
     let cancelled = false;
     async function load() {
       try {
-        const [allPokemon, assigned, metricsData, history, lbData] = await Promise.allSettled([
-          api.getPokemon(), api.getAssignedPokemon(), api.getAccuracyMetrics(), api.getBattleHistory(), api.getLeaderboard(),
+        const isLoggedIn = !!getStoredUser();
+
+        // Always fetch public data
+        const [allPokemon, lbData] = await Promise.allSettled([
+          api.getPokemon(),
+          api.getLeaderboard(),
         ]);
+
         if (cancelled) return;
 
         let pokemonList: import('@/types').Pokemon[] = [];
@@ -538,30 +543,50 @@ export default function DashboardPage() {
           pokemonList = allPokemon.value;
           setTotalPokemon(pokemonList.length);
         }
-        if (assigned.status === 'fulfilled') setAssignedPokemon(assigned.value.length);
-        if (metricsData.status === 'fulfilled') setMetrics(metricsData.value);
-        if (history.status === 'fulfilled') {
-          const sorted = [...history.value].sort((a, b) => new Date(b.predicted_at).getTime() - new Date(a.predicted_at).getTime());
-          setRecentBattles(sorted.slice(0, 5));
-        }
         if (lbData.status === 'fulfilled') setLeaderboard(lbData.value);
         else setLeaderboard([]);
 
-        // Load last generated team if pokemon data is available
-        if (pokemonList.length > 0) {
-          try {
-            const exportData = await api.getShowdownExport();
-            if (!cancelled && exportData.team_names && exportData.team_names.length > 0) {
-              const mapped = exportData.team_names
-                .map((teamName: string) => {
-                  const found = pokemonList.find(p => p.name === teamName);
-                  return found ? { name: found.name, pokeapi_id: found.pokeapi_id } : null;
-                })
-                .filter((entry): entry is { name: string; pokeapi_id: number } => entry !== null);
-              setLastTeam(mapped.length > 0 ? mapped : null);
+        // Only fetch user-scoped data when logged in
+        if (isLoggedIn) {
+          const [myPool, metricsData, history] = await Promise.allSettled([
+            api.getMyPool(),
+            api.getAccuracyMetrics(),
+            api.getBattleHistory(),
+          ]);
+          if (cancelled) return;
+
+          // If pool returns 401, token is stale — clear it so UI reflects logout
+          if (myPool.status === 'rejected') {
+            const msg = (myPool.reason as Error)?.message ?? '';
+            if (msg.includes('401') || msg.includes('Unauthorized')) {
+              clearUser();
             }
-          } catch {
-            // showdown export may 404 if no team generated yet — silently ignore
+          } else {
+            setAssignedPokemon(myPool.value.filter(p => p.user_assigned).length);
+          }
+
+          if (metricsData.status === 'fulfilled') setMetrics(metricsData.value);
+          if (history.status === 'fulfilled') {
+            const sorted = [...history.value].sort((a, b) => new Date(b.predicted_at).getTime() - new Date(a.predicted_at).getTime());
+            setRecentBattles(sorted.slice(0, 5));
+          }
+
+          // Load last generated team — only for authenticated users
+          if (pokemonList.length > 0) {
+            try {
+              const exportData = await api.getShowdownExport();
+              if (!cancelled && exportData.team_names && exportData.team_names.length > 0) {
+                const mapped = exportData.team_names
+                  .map((teamName: string) => {
+                    const found = pokemonList.find(p => p.name === teamName);
+                    return found ? { name: found.name, pokeapi_id: found.pokeapi_id } : null;
+                  })
+                  .filter((entry): entry is { name: string; pokeapi_id: number } => entry !== null);
+                setLastTeam(mapped.length > 0 ? mapped : null);
+              }
+            } catch {
+              // no team generated yet — ignore
+            }
           }
         }
       } catch (err) {

@@ -12,6 +12,15 @@ export interface CounterTeamParams {
   userId?: string;
 }
 
+export interface CounterTeamFromDataParams {
+  opponent_team: Pokemon[];
+  pokemon_pool: Pokemon[];
+  section?: string;
+  group_name?: string;
+  challenger_region?: string;
+  userId?: string;
+}
+
 @Injectable()
 export class Engine2Service {
   private readonly logger = new Logger(Engine2Service.name);
@@ -105,6 +114,76 @@ export class Engine2Service {
       action_done: 'INSERT',
       affected_table: 'engine_output',
       affected_record: `engine2:${opponent_team.join(',')}`,
+      new_value: JSON.stringify({ recommended_team: result.recommended_team }),
+    });
+
+    return result;
+  }
+
+  async getCounterTeamFromData(params: CounterTeamFromDataParams): Promise<Engine2Response> {
+    const {
+      opponent_team,
+      pokemon_pool,
+      section = '3ISC',
+      group_name = '',
+      challenger_region,
+      userId,
+    } = params;
+
+    // opponent_team and pokemon_pool are already validated as non-empty by the DTO,
+    // but guard here too so the service is safe to call directly.
+    if (opponent_team.length === 0) {
+      throw new BadRequestException({
+        success: false,
+        error: 'opponent_team must not be empty.',
+      });
+    }
+    if (pokemon_pool.length === 0) {
+      throw new BadRequestException({
+        success: false,
+        error: 'pokemon_pool must not be empty.',
+      });
+    }
+
+    const opponentNames = opponent_team.map((p) => p.name);
+
+    this.logger.log(
+      `Engine2 (from-data): opponent=${opponent_team.length}, pool=${pokemon_pool.length}` +
+        (challenger_region ? ` (challenger_region: ${challenger_region})` : ''),
+    );
+
+    // Call ML service with caller-supplied data — no DB lookup required
+    const result = await this.ml.getCounterTeam(opponentNames, opponent_team, pokemon_pool);
+
+    // Persist to engine_output
+    const nativeRegionNote = challenger_region
+      ? `Challenger pool filtered to ${challenger_region}`
+      : 'No region filter applied';
+
+    try {
+      await this.db.insertEngineOutput({
+        section,
+        group_name,
+        engine_type: 'counter_pick',
+        model_used: result.model_used ?? 'ml-service',
+        input_data: JSON.stringify({ opponent_team: opponentNames }),
+        generated_output: JSON.stringify(result),
+        native_region_validation: nativeRegionNote,
+        challenger_region,
+        target_gym_leader: group_name || 'opponent',
+        metric_used: 'counter_success_rate',
+        user_id: userId,
+      });
+    } catch (err) {
+      this.logger.error(`Engine2 (from-data): failed to save engine output — ${(err as Error).message}`);
+    }
+
+    // Audit log
+    this.audit.writeLog({
+      user_or_group: group_name,
+      action_done: 'INSERT',
+      affected_table: 'engine_output',
+      affected_record: `engine2:${opponentNames.join(',')}`,
       new_value: JSON.stringify({ recommended_team: result.recommended_team }),
     });
 
