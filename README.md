@@ -86,7 +86,7 @@ Open [http://localhost:3000](http://localhost:3000)
 ## Engine Summaries
 
 ### Engine 01 — The Forge
-Generates a 6-Pokémon Gym Leader team using ML clustering. Pick a type specialty (Fire, Water, Psychic, etc.), difficulty (Easy/Medium/Hard), region, and gym leader name. Models: K-Means, Decision Tree, Random Forest, Cosine Similarity, Gower's Distance. Outputs team with roles, BST, silhouette score.
+Generates a 4-Pokémon Gym Leader team using ML clustering. Pick a type specialty (Fire, Water, Psychic, etc.), difficulty (Easy/Medium/Hard), region, and gym leader name. Models: K-Means, Decision Tree, Random Forest, Cosine Similarity, Gower's Distance. Outputs team with roles, BST, silhouette score.
 
 ### Engine 02 — The Counter
 Given an opponent's team, recommends the best counter team from the user's assigned Pokémon pool. Falls back to the global assigned pool if the user has no personal pool. Models: Type Advantage Score, K-NN, Decision Tree. Metric: Counter Success Rate.
@@ -110,7 +110,7 @@ Standalone import/export tool for Pokémon Showdown. Paste a PS team text to imp
 Fullscreen live leaderboard at `/wall` with no navigation bar — designed for projector display in a classroom. Polls the leaderboard every 10 seconds with large-format trainer names and animated rank changes.
 
 ### Engine 09 — The Scanner
-Team weakness radar and coverage audit. Enter up to 6 Pokémon names; the system aggregates all `def_vs_*` multipliers across the team and renders a pure SVG 18-axis radar chart. Highlights weaknesses, resistances, and recommends types to add.
+Team weakness radar and coverage audit. Enter up to 4 Pokémon names; the system aggregates all `def_vs_*` multipliers across the team and renders a pure SVG 18-axis radar chart. Highlights weaknesses, resistances, and recommends types to add.
 
 ### Engine 10 — The Replay
 Battle replay timeline parser. Enter a Pokémon Showdown replay ID; the backend fetches the replay JSON, parses `|move|`, `|damage|`, `|switch|`, `|faint|`, `|win|` log events, and returns a structured turn-by-turn timeline displayed in the viewer.

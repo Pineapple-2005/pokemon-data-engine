@@ -52,6 +52,7 @@ export interface CounterSlot {
   type_1: string;
   type_2?: string;
   reason: string;
+  pokeapi_id?: number;
 }
 
 export interface Engine2Response {
@@ -59,6 +60,7 @@ export interface Engine2Response {
   recommended_team: CounterSlot[];
   model_used: string;
   matchup_table: Record<string, { advantage: string; multiplier: number }>;
+  opponent_team_data?: { name: string; pokeapi_id?: number; type_1?: string; type_2?: string }[];
 }
 
 export interface Engine3Response {

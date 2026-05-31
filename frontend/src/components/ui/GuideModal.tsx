@@ -144,7 +144,7 @@ function SectionEngine1() {
       <Heading>◆ HOW TO USE</Heading>
       <Body>
         Select a type speciality (e.g. Fire) and a Challenge Rank, then click CHOOSE THIS TEAM.
-        The ML pipeline builds a balanced 6-Pokémon team optimised for that gym type.
+        The ML pipeline builds a balanced 4-Pokémon team optimised for that gym type.
       </Body>
 
       <SubHeading>◆ INPUTS</SubHeading>
@@ -186,7 +186,7 @@ function SectionEngine2() {
     <div>
       <Heading>◆ HOW TO USE</Heading>
       <Body>
-        Enter up to 6 opponent Pokémon names (lowercase, e.g. charizard) and click FIND COUNTERS.
+        Enter up to 4 opponent Pokémon names (lowercase, e.g. charizard) and click FIND COUNTERS.
         The engine returns the top counter picks with a full score breakdown.
       </Body>
 

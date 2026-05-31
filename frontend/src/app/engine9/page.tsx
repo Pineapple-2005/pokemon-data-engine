@@ -20,6 +20,7 @@ const TYPE_COLORS: Record<string, string> = {
   Rock:'#B8A038', Ghost:'#705898', Dragon:'#7038F8', Dark:'#705848',
   Steel:'#B8B8D0', Fairy:'#EE99AC',
 };
+const TEAM_SIZE_LIMIT = 4;
 
 function TypeBadge({ type, variant = 'neutral' }: { type: string; variant?: 'weak' | 'neutral' | 'resist' | 'cover' | 'gap' | 'rec' }) {
   const bg =
@@ -126,14 +127,73 @@ function RadarChart({ profile }: { profile: WeaknessEntry[] }) {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Import helpers
+// ---------------------------------------------------------------------------
+
+function parseNamesFromText(raw: string): string[] {
+  // Split by newlines then commas; strip whitespace/quotes; take first 4 non-empty
+  const parts = raw
+    .split(/[\n,]+/)
+    .map((s) => s.trim().replace(/^["']|["']$/g, '').toLowerCase())
+    .filter(Boolean);
+  return parts.slice(0, TEAM_SIZE_LIMIT);
+}
+
+function parseNamesFromCsv(text: string): string[] {
+  const lines = text.split('\n').filter((l) => l.trim());
+  const names: string[] = [];
+  for (const line of lines) {
+    const cell = line.split(',')[0].trim().replace(/^["']|["']$/g, '').toLowerCase();
+    if (cell) names.push(cell);
+    if (names.length >= TEAM_SIZE_LIMIT) break;
+  }
+  return names;
+}
+
+// ---------------------------------------------------------------------------
+
 export default function Engine9Page() {
-  const [names, setNames] = useState<string[]>(Array(6).fill(''));
+  const [names, setNames] = useState<string[]>(Array(TEAM_SIZE_LIMIT).fill(''));
   const [result, setResult] = useState<ScanResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [importMode, setImportMode] = useState<'none' | 'paste'>('none');
+  const [pasteText, setPasteText] = useState('');
+  const [importError, setImportError] = useState<string | null>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   function setName(i: number, val: string) {
     setNames((prev) => { const n = [...prev]; n[i] = val; return n; });
+  }
+
+  function applyImportedNames(parsed: string[]) {
+    if (parsed.length === 0) { setImportError('No valid names found.'); return; }
+    const next = Array(TEAM_SIZE_LIMIT).fill('');
+    parsed.forEach((n, i) => { next[i] = n; });
+    setNames(next);
+    setImportMode('none');
+    setPasteText('');
+    setImportError(null);
+  }
+
+  function handlePasteApply() {
+    const parsed = parseNamesFromText(pasteText);
+    applyImportedNames(parsed);
+  }
+
+  function handleCsvFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const text = ev.target?.result as string;
+      const parsed = parseNamesFromCsv(text);
+      applyImportedNames(parsed);
+    };
+    reader.readAsText(file);
+    // Reset so same file can be re-selected
+    e.target.value = '';
   }
 
   async function handleScan() {
@@ -177,9 +237,131 @@ export default function Engine9Page() {
           background: '#0a0e1a', border: '1px solid rgba(255,255,255,0.07)',
           borderRadius: '0.875rem', padding: '1.25rem', marginBottom: '1.25rem',
         }}>
-          <p style={{ margin: '0 0 0.875rem', fontSize: '0.5rem', fontFamily: 'var(--font-pixel)', color: 'var(--pk-text-muted)', letterSpacing: '0.08em' }}>
-            ◆ ENTER YOUR TEAM (up to 6 Pokemon)
-          </p>
+          {/* Header row with import toggles */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.875rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+            <p style={{ margin: 0, fontSize: '0.5rem', fontFamily: 'var(--font-pixel)', color: 'var(--pk-text-muted)', letterSpacing: '0.08em' }}>
+              ◆ ENTER YOUR TEAM (up to 4 Pokemon)
+            </p>
+            <div style={{ display: 'flex', gap: '0.4rem' }}>
+              {/* Hidden file input */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv,.txt"
+                style={{ display: 'none' }}
+                onChange={handleCsvFile}
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                style={{
+                  padding: '0.25rem 0.6rem',
+                  background: 'rgba(255,255,255,0.04)',
+                  border: '1px solid rgba(255,255,255,0.12)',
+                  borderRadius: '0.35rem',
+                  color: 'rgba(255,255,255,0.55)',
+                  fontFamily: 'var(--font-pixel)',
+                  fontSize: '0.38rem',
+                  letterSpacing: '0.08em',
+                  cursor: 'pointer',
+                }}
+              >
+                ↑ CSV
+              </button>
+              <button
+                type="button"
+                onClick={() => setImportMode((m) => m === 'paste' ? 'none' : 'paste')}
+                style={{
+                  padding: '0.25rem 0.6rem',
+                  background: importMode === 'paste' ? 'rgba(104,144,240,0.15)' : 'rgba(255,255,255,0.04)',
+                  border: `1px solid ${importMode === 'paste' ? 'rgba(104,144,240,0.4)' : 'rgba(255,255,255,0.12)'}`,
+                  borderRadius: '0.35rem',
+                  color: importMode === 'paste' ? '#6890F0' : 'rgba(255,255,255,0.55)',
+                  fontFamily: 'var(--font-pixel)',
+                  fontSize: '0.38rem',
+                  letterSpacing: '0.08em',
+                  cursor: 'pointer',
+                }}
+              >
+                ✎ PASTE
+              </button>
+            </div>
+          </div>
+
+          {/* Paste text panel */}
+          {importMode === 'paste' && (
+            <div style={{
+              background: 'rgba(104,144,240,0.04)',
+              border: '1px solid rgba(104,144,240,0.2)',
+              borderRadius: '0.5rem',
+              padding: '0.75rem',
+              marginBottom: '0.875rem',
+            }}>
+              <p style={{ margin: '0 0 0.4rem', fontSize: '0.38rem', fontFamily: 'var(--font-pixel)', color: 'rgba(104,144,240,0.7)', letterSpacing: '0.08em' }}>
+                PASTE NAMES — comma or newline separated (up to 4)
+              </p>
+              <textarea
+                value={pasteText}
+                onChange={(e) => setPasteText(e.target.value)}
+                placeholder={'pikachu, charizard, mewtwo\nor one per line'}
+                rows={3}
+                style={{
+                  width: '100%',
+                  background: '#0a0e1a',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: '0.375rem',
+                  color: 'var(--pk-text)',
+                  fontSize: '0.78rem',
+                  fontFamily: 'monospace',
+                  padding: '0.5rem 0.6rem',
+                  resize: 'vertical',
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                }}
+              />
+              {importError && (
+                <p style={{ margin: '0.3rem 0 0', fontSize: '0.7rem', color: '#EF4444' }}>{importError}</p>
+              )}
+              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                <button
+                  type="button"
+                  onClick={handlePasteApply}
+                  disabled={!pasteText.trim()}
+                  style={{
+                    padding: '0.3rem 0.75rem',
+                    background: pasteText.trim() ? 'rgba(104,144,240,0.18)' : 'rgba(255,255,255,0.03)',
+                    border: '1px solid rgba(104,144,240,0.35)',
+                    borderRadius: '0.35rem',
+                    color: pasteText.trim() ? '#6890F0' : 'rgba(255,255,255,0.25)',
+                    fontFamily: 'var(--font-pixel)',
+                    fontSize: '0.38rem',
+                    letterSpacing: '0.08em',
+                    cursor: pasteText.trim() ? 'pointer' : 'not-allowed',
+                  }}
+                >
+                  APPLY
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setImportMode('none'); setPasteText(''); setImportError(null); }}
+                  style={{
+                    padding: '0.3rem 0.75rem',
+                    background: 'transparent',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: '0.35rem',
+                    color: 'rgba(255,255,255,0.35)',
+                    fontFamily: 'var(--font-pixel)',
+                    fontSize: '0.38rem',
+                    letterSpacing: '0.08em',
+                    cursor: 'pointer',
+                  }}
+                >
+                  CANCEL
+                </button>
+              </div>
+            </div>
+          )}
+
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '0.75rem', marginBottom: '1rem' }}>
             {names.map((name, i) => (
               <PokemonAutocomplete

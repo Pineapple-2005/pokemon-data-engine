@@ -21,11 +21,12 @@ const ROLE_MOVES: Record<string, [string, string, string, string]> = {
 }
 
 const DEFAULT_MOVES: [string, string, string, string] = ['Body Slam', 'Earthquake', 'Ice Beam', 'Thunderbolt']
+const TEAM_SIZE_LIMIT = 4
 
 // ---------------------------------------------------------------------------
 // parseShowdownTeam
 //
-// Accepts Pokémon Showdown export text and returns up to 6 lowercase
+// Accepts Pokémon Showdown export text and returns up to 4 lowercase
 // Pokémon names.  Lines that are blank, section headers (===...===), or
 // move lines (starting with -) are skipped.  Handles:
 //   "Pikachu"              → "pikachu"
@@ -36,7 +37,7 @@ export function parseShowdownTeam(text: string): string[] {
   const names: string[] = []
 
   for (const rawLine of text.split('\n')) {
-    if (names.length >= 6) break
+    if (names.length >= TEAM_SIZE_LIMIT) break
 
     const line = rawLine.trim()
 

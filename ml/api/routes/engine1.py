@@ -22,7 +22,7 @@ router = APIRouter(prefix="/engine1", tags=["Engine 1 — Gym Leader Team Genera
     response_model=Engine1Response,
     summary="Generate a Gym Leader team",
     description=(
-        "Builds a themed 6-Pokémon team using K-Means, Decision Tree, "
+        "Builds a themed 4-Pokémon team using K-Means, Decision Tree, "
         "Random Forest, cosine similarity, and Gower diversity. "
         "All Pokémon data must be supplied in the request body — "
         "this endpoint is stateless and does not connect to the database."

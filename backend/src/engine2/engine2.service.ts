@@ -77,6 +77,18 @@ export class Engine2Service {
       if (challenger_region) poolFilter.native_region = challenger_region;
       assignedPool = await this.db.findAllPokemon(poolFilter);
     }
+
+    // Final fallback: if still empty (no is_assigned rows seeded), use all non-restricted Pokémon
+    if (assignedPool.length === 0) {
+      const fallbackFilter: Parameters<typeof this.db.findAllPokemon>[0] = { restricted_status: 'none' };
+      if (challenger_region) fallbackFilter.native_region = challenger_region;
+      assignedPool = await this.db.findAllPokemon(fallbackFilter);
+    }
+    // If region filter still yields nothing, drop the region constraint
+    if (assignedPool.length === 0) {
+      assignedPool = await this.db.findAllPokemon({ restricted_status: 'none' });
+    }
+
     this.logger.log(
       `Engine2: opponent=${opponentData.length}, assigned_pool=${assignedPool.length}` +
         (challenger_region ? ` (challenger_region: ${challenger_region})` : ''),
@@ -84,6 +96,20 @@ export class Engine2Service {
 
     // 3. Call ML service
     const result = await this.ml.getCounterTeam(opponent_team, opponentData, assignedPool);
+
+    // Enrich recommended_team with pokeapi_id for frontend sprites
+    const poolById = new Map(assignedPool.map((p) => [p.name.toLowerCase(), p.pokeapi_id]));
+    result.recommended_team.forEach((c) => {
+      c.pokeapi_id = poolById.get(c.name.toLowerCase());
+    });
+
+    // Enrich opponent_team_data for VS table sprites
+    result.opponent_team_data = opponentData.map((p) => ({
+      name: p.name,
+      pokeapi_id: p.pokeapi_id,
+      type_1: p.type_1 ?? undefined,
+      type_2: p.type_2 ?? undefined,
+    }));
 
     // 4. Persist to engine_output
     const nativeRegionNote = challenger_region
@@ -154,6 +180,16 @@ export class Engine2Service {
 
     // Call ML service with caller-supplied data — no DB lookup required
     const result = await this.ml.getCounterTeam(opponentNames, opponent_team, pokemon_pool);
+
+    // Enrich sprites
+    const fromDataPoolById = new Map(pokemon_pool.map((p) => [p.name.toLowerCase(), p.pokeapi_id]));
+    result.recommended_team.forEach((c) => { c.pokeapi_id = fromDataPoolById.get(c.name.toLowerCase()); });
+    result.opponent_team_data = opponent_team.map((p) => ({
+      name: p.name,
+      pokeapi_id: p.pokeapi_id,
+      type_1: p.type_1 ?? undefined,
+      type_2: p.type_2 ?? undefined,
+    }));
 
     // Persist to engine_output
     const nativeRegionNote = challenger_region

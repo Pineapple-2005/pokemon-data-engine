@@ -86,7 +86,7 @@ function PokemonSlotInput({ value, onChange, slotNumber }: PokemonSlotInputProps
 
 /* ── Battle-side team input ─────────────────────────────── */
 function TeamInput({
-  label, battlerName, onBattlerChange, slots, onSlotChange, accentColor, onRandomize,
+  label, battlerName, onBattlerChange, slots, onSlotChange, accentColor, onRandomize, onImport, showCounterPick,
 }: {
   readonly label: string;
   readonly battlerName: string;
@@ -95,49 +95,122 @@ function TeamInput({
   readonly onSlotChange: (i: number, v: string) => void;
   readonly accentColor: 'red' | 'blue';
   readonly onRandomize?: (names: string[]) => void;
+  readonly onImport?: (names: string[]) => void;
+  readonly showCounterPick?: boolean;
 }) {
   const isRed = accentColor === 'red';
   const accent = isRed ? '#EF4444' : '#6890F0';
   const accentBg = isRed ? 'rgba(239,68,68,0.12)' : 'rgba(104,144,240,0.12)';
+  const [pasteOpen, setPasteOpen] = React.useState(false);
+  const [pasteText, setPasteText] = React.useState('');
+  const fileRef = React.useRef<HTMLInputElement>(null);
 
   function handleRandomize() {
     const shuffled = [...GEN1_POKEMON].sort(() => Math.random() - 0.5);
-    const names = shuffled.slice(0, 6).map((p) => p.name);
+    const names = shuffled.slice(0, 4).map((p) => p.name);
     onRandomize?.(names);
   }
+
+  function handleCSVUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const text = ev.target?.result as string;
+      const lines = text.split('\n').filter(Boolean);
+      const hasHeader = lines[0]?.toLowerCase().includes('name');
+      const dataLines = hasHeader ? lines.slice(1) : lines;
+      const names = dataLines
+        .map((l) => {
+          const cols = l.split(',');
+          const nameCol = hasHeader ? cols[1] : cols[0];
+          return (nameCol ?? '').replace(/"/g, '').trim();
+        })
+        .filter(Boolean)
+        .slice(0, 4);
+      onImport?.(names);
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  }
+
+  function handlePasteLoad() {
+    const names: string[] = [];
+    for (const line of pasteText.split('\n')) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('-') || trimmed.startsWith('===')) continue;
+      const cleaned = trimmed.replace(/ @.*/, '').replace(/\(.*?\)/, '').trim();
+      if (cleaned) names.push(cleaned);
+      if (names.length === 4) break;
+    }
+    if (names.length > 0) { onImport?.(names); setPasteOpen(false); setPasteText(''); }
+  }
+
+  function handleCounterPick() {
+    const raw = sessionStorage.getItem('counter_team_transfer');
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw) as { myTeam?: string[] };
+      if (Array.isArray(parsed.myTeam) && parsed.myTeam.length > 0) {
+        onImport?.(parsed.myTeam.slice(0, 4));
+      }
+    } catch { /* ignore */ }
+  }
+
+  const btnStyle = (color: string): React.CSSProperties => ({
+    display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
+    background: 'transparent', border: `1px solid ${color}55`,
+    borderRadius: '0.4rem', color, fontFamily: 'var(--font-pixel)',
+    fontSize: '0.38rem', letterSpacing: '0.05em', padding: '0.3rem 0.6rem',
+    cursor: 'pointer', transition: 'all 0.15s ease',
+  });
 
   return (
     <div className={isRed ? 'battle-side-player' : 'battle-side-opponent'}>
       {/* Team label pill */}
-      <div style={{ marginBottom: '0.875rem' }}>
+      <div style={{ marginBottom: '0.875rem', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', borderRadius: '999px', padding: '0.25rem 0.875rem', background: accent, fontSize: '0.55rem', fontFamily: 'var(--font-pixel)', color: '#fff', letterSpacing: '0.06em', boxShadow: `0 0 12px ${accent}55` }}>
           {isRed ? '🔴' : '🔵'} {label}
         </div>
+        <span style={{ fontSize: '0.42rem', fontFamily: 'var(--font-pixel)', color: accent, letterSpacing: '0.08em', opacity: 0.85 }}>
+          {isRed ? '— MY TEAM' : '— OPPONENT'}
+        </span>
       </div>
 
-      {/* Random team button */}
-      <button
-        type="button"
-        onClick={handleRandomize}
-        style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: '0.4rem',
-          background: 'transparent',
-          border: `1px solid ${accent}55`,
-          borderRadius: '0.4rem',
-          color: accent,
-          fontFamily: 'var(--font-pixel)',
-          fontSize: '0.42rem',
-          letterSpacing: '0.06em',
-          padding: '0.35rem 0.75rem',
-          cursor: 'pointer',
-          transition: 'all 0.15s ease',
-          marginBottom: '0.875rem',
-        }}
-      >
-        🎲 RANDOM TEAM
-      </button>
+      {/* Action buttons row */}
+      <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginBottom: '0.875rem' }}>
+        <button type="button" onClick={handleRandomize} style={btnStyle(accent)}>
+          🎲 RANDOM
+        </button>
+        <input ref={fileRef} type="file" accept=".csv" style={{ display: 'none' }} onChange={handleCSVUpload} />
+        <button type="button" onClick={() => fileRef.current?.click()} style={btnStyle('#F8D030')}>
+          📂 CSV
+        </button>
+        <button type="button" onClick={() => setPasteOpen((v) => !v)} style={btnStyle('#A890F0')}>
+          📋 PASTE PS
+        </button>
+        {showCounterPick && (
+          <button type="button" onClick={handleCounterPick} style={btnStyle('#4ADE80')}>
+            ⚔ COUNTER PICK
+          </button>
+        )}
+      </div>
+
+      {/* Paste PS textarea */}
+      {pasteOpen && (
+        <div style={{ marginBottom: '0.75rem' }}>
+          <textarea
+            value={pasteText}
+            onChange={(e) => setPasteText(e.target.value)}
+            placeholder={'Paste Pokémon Showdown team text here...\n\nPikachu\n- Thunderbolt\n...'}
+            rows={5}
+            style={{ width: '100%', background: 'rgba(10,14,26,0.8)', border: `1px solid ${accent}44`, borderRadius: '0.4rem', color: 'var(--pk-text)', fontFamily: 'var(--font-body)', fontSize: '0.75rem', padding: '0.5rem', resize: 'vertical', boxSizing: 'border-box' }}
+          />
+          <button type="button" onClick={handlePasteLoad} style={{ ...btnStyle(accent), marginTop: '0.35rem', padding: '0.35rem 0.75rem' }}>
+            LOAD TEAM
+          </button>
+        </div>
+      )}
 
       <div style={{ marginBottom: '0.875rem' }}>
         <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.5rem', fontFamily: 'var(--font-pixel)', color: 'var(--pk-text-muted)', marginBottom: '0.375rem', letterSpacing: '0.06em' }}>
@@ -202,8 +275,8 @@ function BattleFlash({ active }: { readonly active: boolean }) {
 export default function Engine3Page() {
   const [battlerA, setBattlerA] = useState('');
   const [battlerB, setBattlerB] = useState('');
-  const [teamA, setTeamA] = useState<string[]>(['', '', '', '', '', '']);
-  const [teamB, setTeamB] = useState<string[]>(['', '', '', '', '', '']);
+  const [teamA, setTeamA] = useState<string[]>(['', '', '', '']);
+  const [teamB, setTeamB] = useState<string[]>(['', '', '', '']);
   const [loading, setLoading] = useState(false);
   const [prediction, setPrediction] = useState<Engine3Response | null>(null);
   const [currentMatchId, setCurrentMatchId] = useState('');
@@ -225,15 +298,42 @@ export default function Engine3Page() {
 
   function randomizeTeam(setter: React.Dispatch<React.SetStateAction<string[]>>) {
     const shuffled = [...GEN1_POKEMON].sort(() => Math.random() - 0.5);
-    setter(shuffled.slice(0, 6).map((p) => p.name));
+    setter(shuffled.slice(0, 4).map((p) => p.name));
   }
 
-  const handleRandomizeA = useCallback((names: string[]) => {
-    setTeamA(names);
+  const handleRandomizeA = useCallback((names: string[]) => { setTeamA(names); }, []);
+  const handleRandomizeB = useCallback((names: string[]) => { setTeamB(names); }, []);
+
+  const handleImportA = useCallback((names: string[]) => {
+    const padded = [...names.slice(0, 4)];
+    while (padded.length < 4) padded.push('');
+    setTeamA(padded);
   }, []);
 
-  const handleRandomizeB = useCallback((names: string[]) => {
-    setTeamB(names);
+  const handleImportB = useCallback((names: string[]) => {
+    const padded = [...names.slice(0, 4)];
+    while (padded.length < 4) padded.push('');
+    setTeamB(padded);
+  }, []);
+
+  /* ── Read counter team transfer from Engine 2 ─────────── */
+  useEffect(() => {
+    const raw = sessionStorage.getItem('counter_team_transfer');
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw) as { myTeam?: string[]; opponentTeam?: string[] };
+      sessionStorage.removeItem('counter_team_transfer');
+      if (Array.isArray(parsed.myTeam) && parsed.myTeam.length > 0) {
+        const padded = [...parsed.myTeam.slice(0, 4)];
+        while (padded.length < 4) padded.push('');
+        setTeamA(padded);
+      }
+      if (Array.isArray(parsed.opponentTeam) && parsed.opponentTeam.length > 0) {
+        const padded = [...parsed.opponentTeam.slice(0, 4)];
+        while (padded.length < 4) padded.push('');
+        setTeamB(padded);
+      }
+    } catch { /* ignore */ }
   }, []);
 
   /* ── Read gym team transfer from Engine 1 ─────────────── */
@@ -244,8 +344,8 @@ export default function Engine3Page() {
       const parsed = JSON.parse(raw) as { names?: string[]; theme?: string; difficulty?: string };
       sessionStorage.removeItem('gym_team_transfer');
       if (Array.isArray(parsed.names)) {
-        const padded: string[] = [...parsed.names.slice(0, 6)];
-        while (padded.length < 6) padded.push('');
+        const padded: string[] = [...parsed.names.slice(0, 4)];
+        while (padded.length < 4) padded.push('');
         setTeamA(padded);
       }
       const trainerName = parsed.theme ? `${parsed.theme} Gym Leader` : 'Gym Leader';
@@ -375,6 +475,8 @@ export default function Engine3Page() {
             onSlotChange={updateTeamA}
             accentColor="red"
             onRandomize={handleRandomizeA}
+            onImport={handleImportA}
+            showCounterPick={true}
           />
           <div className="battle-vs-badge" aria-hidden="true">VS</div>
           <TeamInput
@@ -385,6 +487,8 @@ export default function Engine3Page() {
             onSlotChange={updateTeamB}
             accentColor="blue"
             onRandomize={handleRandomizeB}
+            onImport={handleImportB}
+            showCounterPick={false}
           />
         </div>
 
@@ -450,7 +554,7 @@ export default function Engine3Page() {
                     <path d="M7 7H4C4 9.5 5.5 11 7 11.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
                     <path d="M17 7H20C20 9.5 18.5 11 17 11.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
                   </svg>
-                  ★ WINNER: {prediction.predicted_winner.toUpperCase()} ★
+                  🏆 WINNER: {prediction.predicted_winner === battlerA || prediction.predicted_winner.toUpperCase() === 'A' ? `${battlerA || 'Team A'} (MY TEAM)` : `${battlerB || 'Team B'} (OPPONENT)`} 🏆
                 </span>
               </div>
 
@@ -462,9 +566,9 @@ export default function Engine3Page() {
               {/* Winner / loser banners */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1.25rem' }}>
                 {[
-                  { name: battlerA || 'Team A', isWinner: winnerIsA, accent: '#EF4444' },
-                  { name: battlerB || 'Team B', isWinner: !winnerIsA, accent: '#6890F0' },
-                ].map(({ name, isWinner, accent }) => (
+                  { name: battlerA || 'Team A', label: 'MY TEAM', isWinner: winnerIsA, accent: '#EF4444' },
+                  { name: battlerB || 'Team B', label: 'OPPONENT', isWinner: !winnerIsA, accent: '#6890F0' },
+                ].map(({ name, label, isWinner, accent }) => (
                   <div key={name} style={{
                     borderRadius: '0.75rem',
                     padding: '0.875rem 0.75rem',
@@ -478,8 +582,11 @@ export default function Engine3Page() {
                     {isWinner && (
                       <div aria-hidden="true" style={{ position: 'absolute', inset: 0, background: `radial-gradient(ellipse 80% 50% at 50% 100%, ${accent}18 0%, transparent 70%)`, pointerEvents: 'none' }} />
                     )}
+                    <p style={{ margin: '0 0 0.15rem', fontSize: '0.38rem', fontFamily: 'var(--font-pixel)', color: accent, letterSpacing: '0.08em', opacity: 0.7 }}>
+                      {label}
+                    </p>
                     <p style={{ margin: '0 0 0.25rem', fontSize: '0.48rem', fontFamily: 'var(--font-pixel)', color: isWinner ? accent : 'var(--pk-text-dim)', letterSpacing: '0.06em' }}>
-                      {isWinner ? '★ WINNER ★' : 'DEFEATED'}
+                      {isWinner ? '🏆 WINNER 🏆' : 'DEFEATED'}
                     </p>
                     <p style={{ margin: 0, fontWeight: 800, color: isWinner ? '#fff' : 'var(--pk-text-muted)', textTransform: 'capitalize', fontSize: '0.95rem' }}>
                       {name}
@@ -488,7 +595,7 @@ export default function Engine3Page() {
                 ))}
               </div>
 
-              <PredictionResult result={prediction} battlerA={battlerA} battlerB={battlerB} />
+              <PredictionResult result={prediction} battlerA={battlerA} />
             </div>
           </div>
 

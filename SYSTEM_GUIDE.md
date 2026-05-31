@@ -153,7 +153,7 @@ All engine POST endpoints require a Bearer token (`Authorization: Bearer <token>
 **Route:** `/engine1` · **Auth:** Required · **ML:** K-Means clustering
 
 ### What it does
-Generates a 6-Pokémon Gym Leader team tailored to a chosen type specialty and difficulty. Uses ML clustering to find the best-fitting Pokémon for each role slot.
+Generates a 4-Pokémon Gym Leader team tailored to a chosen type specialty and difficulty. Uses ML clustering to find the best-fitting Pokémon for each role slot.
 
 ### How to use
 1. Select a **Type Specialty** (Fire, Water, Ghost, Dragon, Balanced, etc.)
@@ -163,7 +163,7 @@ Generates a 6-Pokémon Gym Leader team tailored to a chosen type specialty and d
 5. Click **CHOOSE THIS TEAM**
 
 ### Output
-- 6 Pokémon with role (Sweeper, Tank, Wall, Support, Balanced)
+- 4 Pokémon with role (Sweeper, Tank, Wall, Support, Balanced)
 - Silhouette Score (clustering quality — closer to 1.0 = better)
 - AI explanation of the team composition
 - **EXPORT FOR SHOWDOWN** → copies team in PS-importable format
@@ -193,7 +193,7 @@ Generates a 6-Pokémon Gym Leader team tailored to a chosen type specialty and d
 Given an opponent's Gym Leader team, recommends the best counter team from your assigned Pokémon pool.
 
 ### How to use
-1. Enter up to 6 of the **opponent's Pokémon** (use the autocomplete search)
+1. Enter up to 4 of the **opponent's Pokémon** (use the autocomplete search)
 2. Optionally: click **IMPORT FROM SHOWDOWN** to paste a PS team text directly
 3. Select your **region** if applicable
 4. Click **COUNTER**
@@ -235,8 +235,8 @@ Predicts the winner of a Pokémon battle BEFORE it happens. After the battle, re
 ### How to use
 **Before battle:**
 1. Enter a unique **Match ID** (e.g. `match_jardo_vs_tone_01`)
-2. Enter **Trainer A name** and their 6 Pokémon
-3. Enter **Trainer B name** and their 6 Pokémon
+2. Enter **Trainer A name** and their 4 Pokémon
+3. Enter **Trainer B name** and their 4 Pokémon
 4. Click **PREDICT** → prediction is locked
 
 **After battle:**
@@ -369,7 +369,7 @@ A standalone import/export utility for Pokémon Showdown team formats.
 5. Click **USE THIS TEAM** to send the found Pokémon to Engine 02
 
 ### Export panel
-1. Select up to 6 Pokémon from your pool using the chip selector
+1. Select up to 4 Pokémon from your pool using the chip selector
 2. Click **COPY TO CLIPBOARD**
 3. Paste into PS teambuilder → Import/Export
 
@@ -416,7 +416,7 @@ Open `http://localhost:3000/wall` on a projector browser. The page auto-refreshe
 **Route:** `/engine9` · **Auth:** Required
 
 ### What it does
-Analyses a team of up to 6 Pokémon and produces a type weakness profile with an SVG radar chart across all 18 types.
+Analyses a team of up to 4 Pokémon and produces a type weakness profile with an SVG radar chart across all 18 types.
 
 ### How to use
 1. Type Pokémon names in the 6 input fields (autocomplete supported)
@@ -434,7 +434,7 @@ Analyses a team of up to 6 Pokémon and produces a type weakness profile with an
   - Recommended types to add for better coverage
 
 ### How it calculates
-For each type, the system averages the `def_vs_{type}` multiplier across all 6 Pokémon. Values above 1.5 = critical weakness, below 0.75 = strong resistance.
+For each type, the system averages the `def_vs_{type}` multiplier across all 4 Pokémon. Values above 1.5 = critical weakness, below 0.75 = strong resistance.
 
 ---
 

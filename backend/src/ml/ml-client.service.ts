@@ -43,6 +43,7 @@ export interface CounterRecommendation {
   type_2?: string;
   total_base_stats: number;
   reason: string;
+  pokeapi_id?: number;
 }
 
 export interface Engine2Response {
@@ -50,6 +51,7 @@ export interface Engine2Response {
   recommended_team: CounterRecommendation[];   // replaces stale counter_team: string[]
   model_used: string;
   matchup_table: Record<string, { advantage: string; multiplier: number }>;
+  opponent_team_data?: { name: string; pokeapi_id?: number; type_1?: string; type_2?: string }[];
 }
 
 export interface Engine3PredictResponse {
@@ -84,8 +86,7 @@ export interface MlModelMetrics {
 
 export interface RetrainData {
   match_id: string;
-  actual_winner: string;
-  correct_prediction: 0 | 1;
+  winner: 'A' | 'B';   // "A" or "B" — Python looks up stats and computes features
   team_a: string[];
   team_b: string[];
 }

@@ -10,6 +10,8 @@ GET   /engine3/metrics   — return evaluation metrics from the test set
 from __future__ import annotations
 
 import logging
+import os
+import sqlite3
 
 from fastapi import APIRouter, HTTPException
 
@@ -28,9 +30,31 @@ from ml.engines.engine3_battle_predictor import (
     train,
     retrain_with_ground_truth,
     get_metrics,
+    _ML_ROOT,
 )
+from ml.utils.feature_builder import build_team_features as _build_features
 
 logger = logging.getLogger(__name__)
+
+_DB_PATH = (_ML_ROOT / os.getenv("DB_PATH", "../pokemon.db")).resolve()
+
+
+def _load_pokemon_by_names(names: list[str]) -> list[dict]:
+    """Look up Pokémon dicts from the SQLite DB by name (case-insensitive)."""
+    if not _DB_PATH.exists() or not names:
+        return []
+    name_set = {n.lower() for n in names}
+    try:
+        conn = sqlite3.connect(str(_DB_PATH))
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM pokemon")
+        rows = [dict(r) for r in cursor.fetchall() if r["name"].lower() in name_set]
+        conn.close()
+        return rows
+    except Exception as exc:
+        logger.warning("DB lookup failed in retrain route: %s", exc)
+        return []
 
 router = APIRouter(prefix="/engine3", tags=["Engine 3 — Battle Predictor"])
 
@@ -102,7 +126,26 @@ async def train_models(request: Engine3TrainRequest) -> TrainingMetrics:
 )
 async def retrain_with_result(battle: GroundTruthBattle) -> RetrainResult:
     try:
-        result = retrain_with_ground_truth(battle.model_dump())
+        data = battle.model_dump(exclude={"match_id", "team_a", "team_b"})
+
+        # NestJS format: compute features from team names via DB lookup
+        if battle.team_a and battle.team_b:
+            team_a_data = _load_pokemon_by_names(battle.team_a)
+            team_b_data = _load_pokemon_by_names(battle.team_b)
+            if team_a_data and team_b_data:
+                features = _build_features(team_a_data, team_b_data)
+                data.update(features)
+                logger.info(
+                    "Retrain: computed features from DB for teams %s vs %s",
+                    battle.team_a, battle.team_b,
+                )
+            else:
+                logger.warning(
+                    "Retrain: DB lookup returned no data for teams %s / %s — using zero features",
+                    battle.team_a, battle.team_b,
+                )
+
+        result = retrain_with_ground_truth(data)
         return RetrainResult(**result)
     except Exception as exc:
         logger.exception("Engine 3 retrain error")

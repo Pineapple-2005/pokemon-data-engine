@@ -7,6 +7,7 @@ import { api } from '@/lib/api';
 import type { Pokemon } from '@/types';
 
 const SPRITE_BASE = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon';
+const TEAM_SIZE_LIMIT = 4;
 
 const PLACEHOLDER_MOVES = ['Body Slam', 'Earthquake', 'Ice Beam', 'Thunderbolt'];
 
@@ -56,7 +57,7 @@ export default function Engine7Page() {
       const next = new Set(prev);
       if (next.has(pokemonId)) {
         next.delete(pokemonId);
-      } else if (next.size < 6) {
+      } else if (next.size < TEAM_SIZE_LIMIT) {
         next.add(pokemonId);
       }
       return next;
@@ -189,10 +190,10 @@ export default function Engine7Page() {
               </p>
               <span style={{
                 fontSize: '0.42rem', fontFamily: 'var(--font-pixel)',
-                color: selected.size === 6 ? '#F8D030' : 'var(--pk-text-muted)',
+                color: selected.size === TEAM_SIZE_LIMIT ? '#F8D030' : 'var(--pk-text-muted)',
                 letterSpacing: '0.06em',
               }}>
-                {selected.size}/6 SELECTED
+                {selected.size}/{TEAM_SIZE_LIMIT} SELECTED
               </span>
             </div>
 
@@ -213,8 +214,8 @@ export default function Engine7Page() {
                         background: isSelected ? 'rgba(239,68,68,0.12)' : 'rgba(0,0,0,0.3)',
                         border: isSelected ? '1px solid rgba(239,68,68,0.5)' : '1px solid rgba(255,255,255,0.08)',
                         borderRadius: '0.4rem',
-                        cursor: !isSelected && selected.size >= 6 ? 'not-allowed' : 'pointer',
-                        opacity: !isSelected && selected.size >= 6 ? 0.4 : 1,
+                        cursor: !isSelected && selected.size >= TEAM_SIZE_LIMIT ? 'not-allowed' : 'pointer',
+                        opacity: !isSelected && selected.size >= TEAM_SIZE_LIMIT ? 0.4 : 1,
                         transition: 'all 0.15s ease',
                       }}
                     >

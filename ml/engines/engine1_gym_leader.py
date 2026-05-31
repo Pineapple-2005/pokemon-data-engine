@@ -1,12 +1,12 @@
 """
 Engine 1 — Gym Leader Team Generator
 ======================================
-Builds a 6-Pokémon themed team for a Gym Leader using:
+Builds a 4-Pokémon themed team for a Gym Leader using:
   • K-Means clustering (k=5) on stat features → cluster role assignment
   • Decision Tree (max_depth=5) → role prediction for each Pokémon
   • Random Forest (n_estimators=50) → usefulness scoring
   • Cosine Similarity → Ace selection (closest to theme centroid)
-  • Gower's Distance → diversity enforcement (avoid 6 clones)
+  • Gower's Distance → diversity enforcement
   • Difficulty scaling → filter by total_base_stats percentile
 
 Input arrives from the FastAPI route as a plain Python dict (already validated by Pydantic).
@@ -41,6 +41,7 @@ SCALED_COLS = ["hp_scaled", "attack_scaled", "defense_scaled",
 
 # Role slot definitions for team assembly
 ROLE_SLOTS = ["ace", "sweeper", "tank", "wall", "support", "balanced"]
+REQUIRED_TEAM_SIZE = 4
 
 # Difficulty stat percentile cutoffs (select from this fraction of the pool)
 DIFFICULTY_CONFIG = {
@@ -206,9 +207,9 @@ def generate_team(
         p for p, t in zip(filtered, totals)
         if lo_thresh <= t <= hi_thresh
     ]
-    # Fallback: if the percentile filter leaves fewer than 6 Pokémon (too small a pool),
+    # Fallback: if the percentile filter leaves fewer than required Pokémon (too small a pool),
     # relax to the full filtered set so we can still build a complete team.
-    if len(difficulty_filtered) < 6:
+    if len(difficulty_filtered) < REQUIRED_TEAM_SIZE:
         difficulty_filtered = filtered
 
     # ------------------------------------------------------------------
@@ -364,31 +365,47 @@ def generate_team(
             selected_team.append(pick)
             selected_indices.append(pick["_original_index"])
             used_names.add(pick["name"])
-        if len(selected_team) >= 6:
+        if len(selected_team) >= REQUIRED_TEAM_SIZE:
             break
 
-    # If team still < 6, fill from remaining pool sorted by usefulness
+    # If team still < required size, fill from remaining themed pool
     remaining = sorted(
         [p for p in working_pool if p["name"] not in used_names],
         key=lambda p: p["_usefulness_score"],
         reverse=True,
     )
     for p in remaining:
-        if len(selected_team) >= 6:
+        if len(selected_team) >= REQUIRED_TEAM_SIZE:
             break
         if selected_indices:
-            cand_idx = _most_diverse_candidate(selected_indices, [p["_original_index"]], X_raw)
             selected_team.append(p)
             selected_indices.append(p["_original_index"])
         else:
             selected_team.append(p)
         used_names.add(p["name"])
 
+    # Fallback: themed pool too small — fill remaining slots from full pokemon_pool
+    if len(selected_team) < REQUIRED_TEAM_SIZE:
+        fallback_pool = sorted(
+            [p for p in pokemon_pool if p.get("name") not in used_names],
+            key=lambda p: _safe_float(p.get("total_base_stats", p.get("total", 300))),
+            reverse=True,
+        )
+        for p in fallback_pool:
+            if len(selected_team) >= REQUIRED_TEAM_SIZE:
+                break
+            p_copy = dict(p)
+            p_copy["_role"] = _heuristic_role(p)
+            p_copy["_usefulness_score"] = _safe_float(p.get("total_base_stats", p.get("total", 300))) / 600.0
+            p_copy["_cos_sim"] = 0.0
+            selected_team.append(p_copy)
+            used_names.add(p["name"])
+
     # ------------------------------------------------------------------
     # Step 9 — Build output
     # ------------------------------------------------------------------
     team_slots = []
-    for slot_num, p in enumerate(selected_team[:6], start=1):
+    for slot_num, p in enumerate(selected_team[:REQUIRED_TEAM_SIZE], start=1):
         role = p.get("_role", "balanced")
         team_slots.append({
             "slot": slot_num,

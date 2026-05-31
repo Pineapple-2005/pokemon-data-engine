@@ -15,6 +15,7 @@ import {
   IsOptional,
   IsArray,
   ArrayNotEmpty,
+  ArrayMaxSize,
   IsNumber,
   Min,
 } from 'class-validator';
@@ -44,11 +45,13 @@ class PredictDto {
 
   @IsArray()
   @ArrayNotEmpty()
+  @ArrayMaxSize(4)
   @IsString({ each: true })
   team_a: string[];
 
   @IsArray()
   @ArrayNotEmpty()
+  @ArrayMaxSize(4)
   @IsString({ each: true })
   team_b: string[];
 }

@@ -230,11 +230,14 @@ export class Engine3Service {
     });
 
     // Trigger ML retrain with this new ground truth
+    // Map actual_winner trainer name → "A" or "B" for the ML service
+    const winner_side: 'A' | 'B' =
+      actual_winner.toLowerCase() === prediction.battler_a.toLowerCase() ? 'A' : 'B';
+
     try {
       await this.ml.retrainEngine3({
         match_id,
-        actual_winner,
-        correct_prediction,
+        winner: winner_side,
         team_a: JSON.parse(prediction.team_a) as string[],
         team_b: JSON.parse(prediction.team_b) as string[],
       });

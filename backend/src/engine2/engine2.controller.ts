@@ -9,7 +9,7 @@ import {
   UseGuards,
   Request,
 } from '@nestjs/common';
-import { IsArray, IsString, IsOptional, ArrayNotEmpty, ValidateNested } from 'class-validator';
+import { IsArray, IsString, IsOptional, ArrayNotEmpty, ArrayMaxSize, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { Engine2Service } from './engine2.service';
 import { Engine2Response } from '../ml/ml-client.service';
@@ -19,6 +19,7 @@ import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
 class CounterTeamDto {
   @IsArray()
   @ArrayNotEmpty()
+  @ArrayMaxSize(4)
   @IsString({ each: true })
   opponent_team: string[];
 
@@ -38,6 +39,7 @@ class CounterTeamDto {
 class CounterFromDataDto {
   @IsArray()
   @ArrayNotEmpty()
+  @ArrayMaxSize(4)
   @ValidateNested({ each: true })
   @Type(() => Object)
   opponent_team: Record<string, unknown>[];
