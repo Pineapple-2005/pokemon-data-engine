@@ -13,7 +13,7 @@ Output: data/processed/synthetic_battles.csv
 
 Columns:
     speed_adv, stat_adv, coverage_adv, weakness_adv, hp_adv, atk_adv,
-    sp_atk_adv, def_adv, type_diversity_adv, role_balance_a, matchup_adv,
+    sp_atk_adv, def_adv, type_diversity_adv, role_balance_adv, matchup_adv,
     speed_control_adv, dmg_matchup_adv, winner
     (winner: 0 = team A wins, 1 = team B wins)
 """
@@ -218,7 +218,7 @@ def run_generation(
     output_columns = [
         "speed_adv", "stat_adv", "coverage_adv", "weakness_adv",
         "hp_adv", "atk_adv", "sp_atk_adv", "def_adv",
-        "type_diversity_adv", "role_balance_a", "matchup_adv",
+        "type_diversity_adv", "role_balance_adv", "matchup_adv",
         "speed_control_adv", "dmg_matchup_adv", "winner",
     ]
     for col in output_columns:

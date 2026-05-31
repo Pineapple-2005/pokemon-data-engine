@@ -25,6 +25,7 @@ export interface TeamSlot {
   slot: number;
   role: string;
   name: string;
+  pokeapi_id?: number;
   type_1: string;
   type_2?: string;
   total_base_stats: number;
@@ -33,6 +34,15 @@ export interface TeamSlot {
   native_region?: string;
   generation?: number;
   restricted_status?: string;
+  loadout?: TournamentLoadout;
+}
+
+export interface TournamentLoadout {
+  item: string;
+  ability: string;
+  evs: string;
+  nature: string;
+  moves: [string, string, string, string];
 }
 
 export interface Engine1Response {
@@ -42,6 +52,7 @@ export interface Engine1Response {
   model_used: string;
   metrics: { silhouette_score: number };
   explanation: string;
+  showdown_text?: string;
 }
 
 export interface CounterSlot {
@@ -53,6 +64,8 @@ export interface CounterSlot {
   type_2?: string;
   reason: string;
   pokeapi_id?: number;
+  role?: string;
+  loadout?: TournamentLoadout;
 }
 
 export interface Engine2Response {
@@ -61,6 +74,7 @@ export interface Engine2Response {
   model_used: string;
   matchup_table: Record<string, { advantage: string; multiplier: number }>;
   opponent_team_data?: { name: string; pokeapi_id?: number; type_1?: string; type_2?: string }[];
+  showdown_text?: string;
 }
 
 export interface Engine3Response {

@@ -157,7 +157,7 @@ def build_features(team_a: list[dict], team_b: list[dict]) -> dict:
 FEATURE_ORDER = [
     "speed_adv", "stat_adv", "coverage_adv", "weakness_adv",
     "hp_adv", "atk_adv", "sp_atk_adv", "def_adv",
-    "type_diversity_adv", "role_balance_a", "matchup_adv",
+    "type_diversity_adv", "role_balance_adv", "matchup_adv",
     "speed_control_adv", "dmg_matchup_adv",
 ]
 
@@ -226,7 +226,7 @@ def train(battles_csv_path: Optional[str] = None) -> dict:
 
     CSV columns expected:
         speed_adv, stat_adv, coverage_adv, weakness_adv, hp_adv, atk_adv,
-        sp_atk_adv, def_adv, type_diversity_adv, role_balance_a, matchup_adv,
+        sp_atk_adv, def_adv, type_diversity_adv, role_balance_adv, matchup_adv,
         speed_control_adv, dmg_matchup_adv, winner
     where winner = 'A' or 'B'.
     """
@@ -377,7 +377,6 @@ def _build_battle_reason(features: dict, winner: str) -> str:
     """Describe the top 3 feature advantages for the predicted winner."""
     sign = 1.0 if winner == "A" else -1.0
     # For features named *_adv, positive means A is ahead
-    # For role_balance_a, 1 means A has all roles
     scored: list[tuple[str, float]] = []
     for k, v in features.items():
         impact = float(v) * sign
@@ -501,7 +500,7 @@ def _generate_synthetic_data(n_samples: int = 2000) -> tuple[np.ndarray, np.ndar
         + 0.10 * X[:, 11] / 4.0  # speed_control_adv (range ~[-4,4])
         + 0.10 * X[:, 2]          # coverage_adv
         + 0.08 * X[:, 3] / 10.0  # weakness_adv
-        + 0.05 * X[:, 9]          # role_balance_a
+        + 0.05 * X[:, 9]          # role_balance_adv
         + rng.normal(0, 0.3, n_samples)
     )
     y = (linear_score > 0).astype(int)

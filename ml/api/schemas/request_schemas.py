@@ -75,6 +75,9 @@ class Engine1Request(BaseModel):
     theme: str = Field(..., description="One of the 18 Pokémon types or 'balanced'")
     difficulty: str = Field("medium", description="easy | medium | hard")
     pokemon_pool: list[PokemonData] = Field(..., min_length=1)
+    previous_team: list[str] = Field(default_factory=list)
+    previous_lineups: list[list[str]] = Field(default_factory=list)
+    variation_seed: Optional[int] = None
 
     @field_validator("theme")
     @classmethod
@@ -101,6 +104,7 @@ class TeamSlot(BaseModel):
     slot: int
     role: str
     name: str
+    pokeapi_id: Optional[int] = None
     type_1: Optional[str] = None
     type_2: Optional[str] = None
     total_base_stats: int
@@ -241,7 +245,7 @@ class GroundTruthBattle(BaseModel):
     sp_atk_adv: float = 0.0
     def_adv: float = 0.0
     type_diversity_adv: float = 0.0
-    role_balance_a: float = 0.0
+    role_balance_adv: float = 0.0
     matchup_adv: float = 0.0
     speed_control_adv: float = 0.0
     dmg_matchup_adv: float = 0.0

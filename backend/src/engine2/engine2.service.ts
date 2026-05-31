@@ -3,6 +3,8 @@ import { DatabaseService } from '../database/database.service';
 import { MlClientService, Engine2Response } from '../ml/ml-client.service';
 import { AuditService } from '../audit/audit.service';
 import { Pokemon } from '../common/interfaces/pokemon.interface';
+import { recommendCounterTournamentLoadouts } from '../pokemon/battle-loadout';
+import { formatShowdownTeam } from '../pokemon/showdown.parser';
 
 export interface CounterTeamParams {
   opponent_team: string[];
@@ -102,6 +104,8 @@ export class Engine2Service {
     result.recommended_team.forEach((c) => {
       c.pokeapi_id = poolById.get(c.name.toLowerCase());
     });
+    result.recommended_team = await recommendCounterTournamentLoadouts(result.recommended_team, assignedPool);
+    result.showdown_text = formatShowdownTeam(result.recommended_team);
 
     // Enrich opponent_team_data for VS table sprites
     result.opponent_team_data = opponentData.map((p) => ({
@@ -184,6 +188,8 @@ export class Engine2Service {
     // Enrich sprites
     const fromDataPoolById = new Map(pokemon_pool.map((p) => [p.name.toLowerCase(), p.pokeapi_id]));
     result.recommended_team.forEach((c) => { c.pokeapi_id = fromDataPoolById.get(c.name.toLowerCase()); });
+    result.recommended_team = await recommendCounterTournamentLoadouts(result.recommended_team, pokemon_pool);
+    result.showdown_text = formatShowdownTeam(result.recommended_team);
     result.opponent_team_data = opponent_team.map((p) => ({
       name: p.name,
       pokeapi_id: p.pokeapi_id,

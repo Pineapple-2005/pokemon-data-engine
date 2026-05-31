@@ -7,21 +7,32 @@
  *   formatShowdownTeam — TeamSlot array → PS-importable team text
  */
 
-import type { TeamSlot } from '../ml/ml-client.service'
+import type { TournamentLoadout } from '../ml/ml-client.service'
 
-// ---------------------------------------------------------------------------
-// Role → canonical Gen 1 move set mapping
-// ---------------------------------------------------------------------------
-const ROLE_MOVES: Record<string, [string, string, string, string]> = {
-  sweeper:  ['Hyper Beam',    'Body Slam',    'Earthquake',    'Swords Dance'],
-  tank:     ['Body Slam',     'Earthquake',   'Rock Slide',    'Rest'],
-  wall:     ['Rest',          'Toxic',        'Thunder Wave',  'Body Slam'],
-  support:  ['Thunder Wave',  'Soft-Boiled',  'Seismic Toss',  'Rest'],
-  balanced: ['Body Slam',     'Earthquake',   'Ice Beam',      'Thunderbolt'],
+interface ShowdownExportSlot {
+  name: string
+  loadout?: TournamentLoadout
 }
 
-const DEFAULT_MOVES: [string, string, string, string] = ['Body Slam', 'Earthquake', 'Ice Beam', 'Thunderbolt']
+// ---------------------------------------------------------------------------
+// Generated team export settings
+// ---------------------------------------------------------------------------
 const TEAM_SIZE_LIMIT = 4
+
+const NAME_ALIASES: Record<string, string> = {
+  'farfetch’d': "farfetch'd",
+  'mr mime': 'mr-mime',
+  'mr. mime': 'mr-mime',
+  'nidoran female': 'nidoran-f',
+  'nidoran male': 'nidoran-m',
+  'nidoran♀': 'nidoran-f',
+  'nidoran♂': 'nidoran-m',
+}
+
+export function normalizePokemonName(rawName: string): string {
+  const lowerName = rawName.trim().toLowerCase()
+  return NAME_ALIASES[lowerName] ?? lowerName.replace(/\s+/g, '-')
+}
 
 // ---------------------------------------------------------------------------
 // parseShowdownTeam
@@ -50,15 +61,17 @@ export function parseShowdownTeam(text: string): string[] {
     // Skip move lines
     if (line.startsWith('-')) continue
 
+    // Skip metadata lines in a full Showdown export block
+    if (/^(Ability|EVs|IVs|Level|Gender|Happiness|Tera Type|Shiny):/i.test(line)) continue
+    if (/ Nature$/i.test(line)) continue
+
     // Extract name — stop at '@' (held item) or '(' (nickname prefix)
-    let name = line
-    const atIdx = name.indexOf('@')
-    if (atIdx !== -1) name = name.slice(0, atIdx)
-
-    const parenIdx = name.indexOf('(')
-    if (parenIdx !== -1) name = name.slice(0, parenIdx)
-
-    const normalized = name.trim().toLowerCase()
+    const beforeItem = line.split('@', 1)[0].trim()
+    const parenthesized = (beforeItem.match(/\(([^)]+)\)/g) ?? [])
+      .map((part) => part.slice(1, -1).trim())
+      .find((part) => !/^[mf]$/i.test(part))
+    const species = parenthesized ?? beforeItem.replace(/\s+\([mf]\)\s*$/i, '')
+    const normalized = normalizePokemonName(species)
     if (normalized) names.push(normalized)
   }
 
@@ -69,27 +82,33 @@ export function parseShowdownTeam(text: string): string[] {
 // formatShowdownTeam
 //
 // Accepts a TeamSlot array (from Engine 1 / ML service) and returns a
-// PS-importable Gen 1 team string.  No held items (Gen 1 has none).
+// PS-importable tournament team string with loadout details.
 // Blank line separates each Pokémon block.
 // ---------------------------------------------------------------------------
 export function formatShowdownTeam(
-  team: TeamSlot[],
+  team: ShowdownExportSlot[],
   _theme?: string,
   _difficulty?: string,
 ): string {
   const blocks: string[] = []
 
   for (const slot of team) {
-    const displayName = slot.name.charAt(0).toUpperCase() + slot.name.slice(1)
-
-    const moves = ROLE_MOVES[slot.role.toLowerCase()] ?? DEFAULT_MOVES
+    const displayName = slot.name
+      .split('-')
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join('-')
+    const loadout = slot.loadout
+    if (!loadout) continue
 
     const lines = [
-      displayName,
-      `- ${moves[0]}`,
-      `- ${moves[1]}`,
-      `- ${moves[2]}`,
-      `- ${moves[3]}`,
+      `${displayName} @ ${loadout.item}`,
+      `Ability: ${loadout.ability}`,
+      `EVs: ${loadout.evs}`,
+      `${loadout.nature} Nature`,
+      `- ${loadout.moves[0]}`,
+      `- ${loadout.moves[1]}`,
+      `- ${loadout.moves[2]}`,
+      `- ${loadout.moves[3]}`,
     ]
 
     blocks.push(lines.join('\n'))

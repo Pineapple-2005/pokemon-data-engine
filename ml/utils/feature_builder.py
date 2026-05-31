@@ -180,7 +180,8 @@ def build_team_features(team_a: list[dict], team_b: list[dict]) -> dict:
 
     All features are expressed as (team_a_value - team_b_value) so that
     positive values indicate an advantage for team A.
-    Exception: role_balance_a is team A's absolute role balance score.
+    All features are differential so swapping Team A and Team B also swaps the
+    sign of each feature.
 
     Expected dict keys on each Pokémon:
         type_1, type_2, hp, attack, defense, sp_atk, sp_def, speed,
@@ -201,7 +202,7 @@ def build_team_features(team_a: list[dict], team_b: list[dict]) -> dict:
             sp_atk_adv         — avg sp_atk A - B
             def_adv            — avg defense A - B
             type_diversity_adv — unique type count A - B
-            role_balance_a     — role diversity score for team A (absolute, not differential)
+            role_balance_adv   — role diversity score A - B
             matchup_adv        — head-to-head type matchup score A - B
             speed_control_adv  — count of A members faster than B avg minus reverse; range ~[-4,4]
             dmg_matchup_adv    — type-advantage weighted by offensive stat A - B
@@ -211,7 +212,7 @@ def build_team_features(team_a: list[dict], team_b: list[dict]) -> dict:
         return {k: 0.0 for k in [
             "speed_adv", "stat_adv", "coverage_adv", "weakness_adv",
             "hp_adv", "atk_adv", "sp_atk_adv", "def_adv",
-            "type_diversity_adv", "role_balance_a", "matchup_adv",
+            "type_diversity_adv", "role_balance_adv", "matchup_adv",
             "speed_control_adv", "dmg_matchup_adv",
         ]}
 
@@ -244,7 +245,7 @@ def build_team_features(team_a: list[dict], team_b: list[dict]) -> dict:
         "sp_atk_adv":         _safe_avg(team_a, "sp_atk") - _safe_avg(team_b, "sp_atk"),
         "def_adv":            _safe_avg(team_a, "defense") - _safe_avg(team_b, "defense"),
         "type_diversity_adv": float(len(types_a) - len(types_b)),
-        "role_balance_a":     _compute_role_balance(team_a),
+        "role_balance_adv":   _compute_role_balance(team_a) - _compute_role_balance(team_b),
         "matchup_adv":        _team_matchup_score(team_a, team_b) - _team_matchup_score(team_b, team_a),
         "speed_control_adv":  float(_speed_control(team_a, team_b) - _speed_control(team_b, team_a)),
         "dmg_matchup_adv":    _dmg_matchup(team_a, team_b) - _dmg_matchup(team_b, team_a),

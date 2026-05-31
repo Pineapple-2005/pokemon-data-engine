@@ -37,6 +37,9 @@ async def generate_gym_leader_team(request: Engine1Request) -> Engine1Response:
             theme=request.theme,
             difficulty=request.difficulty,
             pokemon_pool=pool_dicts,
+            previous_team=request.previous_team,
+            previous_lineups=request.previous_lineups,
+            variation_seed=request.variation_seed,
         )
         return Engine1Response(**result)
 

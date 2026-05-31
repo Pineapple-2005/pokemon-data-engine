@@ -23,12 +23,14 @@ export function TeamGrid({ team, title }: TeamGridProps) {
             key={slot.slot}
             slot={slot.slot}
             name={slot.name}
+            pokeapi_id={slot.pokeapi_id}
             type_1={slot.type_1}
             type_2={slot.type_2}
             role={slot.role}
             total_base_stats={slot.total_base_stats}
             usefulness_score={slot.usefulness_score}
             reason={slot.reason}
+            loadout={slot.loadout}
           />
         ))}
       </div>

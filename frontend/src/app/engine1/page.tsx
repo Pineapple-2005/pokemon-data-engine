@@ -7,6 +7,8 @@ import { TypeBadge } from '@/components/ui/TypeBadge';
 import { ProfessorOak } from '@/components/ui/ProfessorOak';
 import { AuthGuard } from '@/components/ui/AuthGuard';
 import { api } from '@/lib/api';
+import { storeBattlePredictorDraft } from '@/lib/battle-transfer';
+import { useSessionState } from '@/hooks/useSessionState';
 import type { Engine1Response, TeamSlot } from '@/types';
 
 /* ── Type colour map ──────────────────────────────────────────────────── */
@@ -155,35 +157,27 @@ function TeamSlotWithCry({ slot }: { readonly slot: TeamSlot }) {
 
 /* ══════════════════════════════════════════════════════════════════════ */
 export default function Engine1Page() {
-  const [theme, setTheme] = useState('Fire');
-  const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium');
-  const [region, setRegion] = useState('Kanto');
-  const [gymLeaderName, setGymLeaderName] = useState('');
-  const [section, setSection] = useState('3ISC');
-  const [groupName, setGroupName] = useState('');
+  const [theme, setTheme] = useSessionState('engine1.theme', 'Fire');
+  const [difficulty, setDifficulty] = useSessionState<'easy' | 'medium' | 'hard'>('engine1.difficulty', 'medium');
+  const [region, setRegion] = useSessionState('engine1.region', 'Kanto');
+  const [gymLeaderName, setGymLeaderName] = useSessionState('engine1.gymLeaderName', '');
+  const [section, setSection] = useSessionState('engine1.section', '3ISC');
+  const [groupName, setGroupName] = useSessionState('engine1.groupName', '');
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<Engine1Response | null>(null);
+  const [result, setResult] = useSessionState<Engine1Response | null>('engine1.result', null);
   const [error, setError] = useState<string | null>(null);
   const [showCopied, setShowCopied] = useState(false);
   const [showOpenTip, setShowOpenTip] = useState(false);
+  const lineupHistoryRef = useRef<string[][]>([]);
 
-  const ROLE_MOVES: Record<string, [string, string, string, string]> = {
-    sweeper:  ['Hyper Beam',   'Body Slam',    'Earthquake',   'Swords Dance'],
-    tank:     ['Body Slam',    'Earthquake',   'Rock Slide',   'Rest'],
-    wall:     ['Rest',         'Toxic',        'Thunder Wave', 'Body Slam'],
-    support:  ['Thunder Wave', 'Soft-Boiled',  'Seismic Toss', 'Rest'],
-    balanced: ['Body Slam',    'Earthquake',   'Ice Beam',     'Thunderbolt'],
-    ace:      ['Body Slam',    'Earthquake',   'Ice Beam',     'Thunderbolt'],
-  };
+  async function getShowdownText(): Promise<string> {
+    if (result?.showdown_text) return result.showdown_text;
+    return (await api.getShowdownExport()).text;
+  }
 
   async function handleShowdownExport() {
     if (!result) return;
-    const blocks = result.team.map((slot) => {
-      const name = slot.name.charAt(0).toUpperCase() + slot.name.slice(1);
-      const moves = ROLE_MOVES[slot.role.toLowerCase()] ?? ['Body Slam', 'Earthquake', 'Ice Beam', 'Thunderbolt'];
-      return [name, `- ${moves[0]}`, `- ${moves[1]}`, `- ${moves[2]}`, `- ${moves[3]}`].join('\n');
-    });
-    const text = blocks.join('\n\n');
+    const text = await getShowdownText();
     try {
       await navigator.clipboard.writeText(text);
     } catch {
@@ -199,7 +193,18 @@ export default function Engine1Page() {
     e.preventDefault();
     setLoading(true); setError(null); setResult(null);
     try {
-      const data = await api.generateGymLeaderTeam(theme, difficulty, region, gymLeaderName, section, groupName);
+      const data = await api.generateGymLeaderTeam(
+        theme,
+        difficulty,
+        region,
+        gymLeaderName,
+        section,
+        groupName,
+        result?.team.map((slot) => slot.name) ?? [],
+        lineupHistoryRef.current,
+        Date.now(),
+      );
+      lineupHistoryRef.current.push(data.team.map((slot) => slot.name));
       setResult(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate team');
@@ -668,8 +673,13 @@ export default function Engine1Page() {
             <button
               type="button"
               onClick={() => {
+                const names = result.team.map(s => s.name);
+                storeBattlePredictorDraft({
+                  battlerA: `${result.theme} Gym Leader`,
+                  teamA: names,
+                });
                 sessionStorage.setItem('gym_team_transfer', JSON.stringify({
-                  names: result.team.map(s => s.name),
+                  names,
                   theme: result.theme,
                   difficulty: result.difficulty,
                 }));
@@ -747,12 +757,7 @@ export default function Engine1Page() {
                   type="button"
                   onClick={async () => {
                     if (result) {
-                      const blocks = result.team.map((slot) => {
-                        const name = slot.name.charAt(0).toUpperCase() + slot.name.slice(1);
-                        const moves = ROLE_MOVES[slot.role.toLowerCase()] ?? ['Body Slam', 'Earthquake', 'Ice Beam', 'Thunderbolt'];
-                        return [name, `- ${moves[0]}`, `- ${moves[1]}`, `- ${moves[2]}`, `- ${moves[3]}`].join('\n');
-                      });
-                      try { await navigator.clipboard.writeText(blocks.join('\n\n')); } catch { /* ignore */ }
+                      try { await navigator.clipboard.writeText(await getShowdownText()); } catch { /* ignore */ }
                     }
                     window.open('https://play.pokemonshowdown.com/teambuilder', '_blank', 'noopener,noreferrer');
                     setShowOpenTip(true);

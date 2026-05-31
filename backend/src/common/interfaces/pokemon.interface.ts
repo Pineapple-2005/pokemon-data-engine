@@ -20,6 +20,7 @@ export interface Pokemon {
   base_experience: number | null;
   ability_1: string | null;
   ability_2: string | null;
+  hidden_ability?: string | null;
   total_base_stats: number;
   attack_ratio: number;
   special_attack_ratio: number;

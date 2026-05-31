@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { TypeBadge } from '@/components/ui/TypeBadge';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { CounterScoreBar } from '@/components/engines/CounterScoreBar';
@@ -9,6 +9,9 @@ import { AuthGuard } from '@/components/ui/AuthGuard';
 import { ShowdownImportModal } from '@/components/ui/ShowdownImportModal';
 import { PokemonAutocomplete } from '@/components/ui/PokemonAutocomplete';
 import { api } from '@/lib/api';
+import { storeBattlePredictorDraft } from '@/lib/battle-transfer';
+import { parsePokemonCsv } from '@/lib/pokemon-import';
+import { useSessionState } from '@/hooks/useSessionState';
 import type { Engine2Response } from '@/types';
 
 /* ── Type colour map (mirrors Engine 1) ────────────────────── */
@@ -79,14 +82,15 @@ function PokemonSlotInput({ index, value, onChange }: { readonly index: number; 
 }
 
 export default function Engine2Page() {
-  const [opponentSlots, setOpponentSlots] = useState<string[]>(['', '', '', '']);
-  const [challengerRegion, setChallengerRegion] = useState('Johto');
-  const [section, setSection] = useState('3ISC');
-  const [groupName, setGroupName] = useState('');
+  const [opponentSlots, setOpponentSlots] = useSessionState<string[]>('engine2.opponentSlots', ['', '', '', '']);
+  const [challengerRegion, setChallengerRegion] = useSessionState('engine2.challengerRegion', 'Johto');
+  const [section, setSection] = useSessionState('engine2.section', '3ISC');
+  const [groupName, setGroupName] = useSessionState('engine2.groupName', '');
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<Engine2Response | null>(null);
+  const [result, setResult] = useSessionState<Engine2Response | null>('engine2.result', null);
   const [error, setError] = useState<string | null>(null);
   const [importModalOpen, setImportModalOpen] = useState(false);
+  const csvInputRef = useRef<HTMLInputElement>(null);
 
   function updateSlot(i: number, val: string) {
     setOpponentSlots((prev) => { const next = [...prev]; next[i] = val; return next; });
@@ -96,6 +100,24 @@ export default function Engine2Page() {
     const next = ['', '', '', ''];
     teamNames.slice(0, 4).forEach((name, i) => { next[i] = name; });
     setOpponentSlots(next);
+  }
+
+  function handleCsvUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const names = parsePokemonCsv(String(event.target?.result ?? ''));
+      if (names.length === 0) {
+        setError('No Pokemon names were found in the CSV file.');
+        return;
+      }
+      setError(null);
+      handleTeamImported(names);
+    };
+    reader.onerror = () => setError('Could not read the CSV file.');
+    reader.readAsText(file);
+    e.target.value = '';
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -115,30 +137,18 @@ export default function Engine2Page() {
 
   const [copied, setCopied] = useState(false);
 
-  const GEN1_MOVES_BY_TYPE: Record<string, [string, string, string, string]> = {
-    Normal: ['Body Slam', 'Earthquake', 'Ice Beam', 'Thunderbolt'],
-    Fire: ['Flamethrower', 'Fire Blast', 'Body Slam', 'Earthquake'],
-    Water: ['Surf', 'Ice Beam', 'Thunderbolt', 'Body Slam'],
-    Grass: ['Razor Leaf', 'Mega Drain', 'Sleep Powder', 'Body Slam'],
-    Electric: ['Thunderbolt', 'Thunder Wave', 'Body Slam', 'Seismic Toss'],
-    Ice: ['Ice Beam', 'Blizzard', 'Body Slam', 'Earthquake'],
-    Fighting: ['Submission', 'Body Slam', 'Earthquake', 'Rock Slide'],
-    Poison: ['Sludge', 'Toxic', 'Body Slam', 'Earthquake'],
-    Ground: ['Earthquake', 'Rock Slide', 'Body Slam', 'Fire Blast'],
-    Flying: ['Drill Peck', 'Body Slam', 'Agility', 'Earthquake'],
-    Psychic: ['Psychic', 'Recover', 'Ice Beam', 'Body Slam'],
-    Bug: ['Pin Missile', 'Mega Drain', 'Body Slam', 'Toxic'],
-    Rock: ['Rock Slide', 'Earthquake', 'Body Slam', 'Fire Blast'],
-    Ghost: ['Night Shade', 'Confuse Ray', 'Hypnosis', 'Body Slam'],
-    Dragon: ['Dragon Rage', 'Agility', 'Body Slam', 'Earthquake'],
-  };
-
   function buildPSText(): string {
     if (!result) return '';
+    if (result.showdown_text) return result.showdown_text;
     return result.recommended_team.map((c) => {
-      const type = c.type_1.charAt(0).toUpperCase() + c.type_1.slice(1);
-      const moves = GEN1_MOVES_BY_TYPE[type] ?? ['Body Slam', 'Earthquake', 'Ice Beam', 'Thunderbolt'];
-      return `${c.name}\n${moves.map((m) => `- ${m}`).join('\n')}`;
+      if (!c.loadout) return c.name;
+      return [
+        `${c.name} @ ${c.loadout.item}`,
+        `Ability: ${c.loadout.ability}`,
+        `EVs: ${c.loadout.evs}`,
+        `${c.loadout.nature} Nature`,
+        ...c.loadout.moves.map((move) => `- ${move}`),
+      ].join('\n');
     }).join('\n\n');
   }
 
@@ -168,9 +178,12 @@ export default function Engine2Page() {
 
   function handleSendToEngine3() {
     if (!result) return;
+    const myTeam = result.recommended_team.map((c) => c.name);
+    const opponentTeam = opponentSlots.filter((s) => s.trim() !== '');
+    storeBattlePredictorDraft({ teamA: myTeam, teamB: opponentTeam });
     sessionStorage.setItem('counter_team_transfer', JSON.stringify({
-      myTeam: result.recommended_team.map((c) => c.name),
-      opponentTeam: opponentSlots.filter((s) => s.trim() !== ''),
+      myTeam,
+      opponentTeam,
     }));
     window.location.href = '/engine3';
   }
@@ -325,6 +338,36 @@ export default function Engine2Page() {
                 </svg>
                 OPPONENT TEAM ROSTER
               </p>
+              <input
+                ref={csvInputRef}
+                type="file"
+                accept=".csv,text/csv"
+                style={{ display: 'none' }}
+                onChange={handleCsvUpload}
+              />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={() => csvInputRef.current?.click()}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                  background: 'transparent',
+                  border: '1px solid rgba(248,208,48,0.4)',
+                  borderRadius: '0.4rem',
+                  color: '#F8D030',
+                  fontFamily: 'var(--font-pixel)',
+                  fontSize: '0.42rem',
+                  letterSpacing: '0.06em',
+                  padding: '0.35rem 0.75rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                CSV IMPORT
+              </button>
               <button
                 type="button"
                 onClick={() => setImportModalOpen(true)}
@@ -355,6 +398,7 @@ export default function Engine2Page() {
               >
                 📥 IMPORT FROM SHOWDOWN
               </button>
+              </div>
             </div>
 
             {/* Slot grid */}
@@ -506,6 +550,27 @@ export default function Engine2Page() {
                         <p style={{ margin: '0.75rem 0 0', fontSize: '0.75rem', color: 'var(--pk-text-muted)', lineHeight: 1.55, borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '0.625rem' }}>
                           {counter.reason}
                         </p>
+                        {counter.loadout && (
+                          <div style={{ marginTop: '0.75rem', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '0.625rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                            <div style={{ fontSize: '0.64rem', color: 'var(--pk-gold)', fontWeight: 700 }}>
+                              {counter.loadout.item}
+                            </div>
+                            <div style={{ fontSize: '0.6rem', color: 'var(--pk-text-muted)' }}>
+                              Ability: {counter.loadout.ability}
+                            </div>
+                            <div style={{ fontSize: '0.56rem', color: 'var(--pk-text-dim)' }}>
+                              {counter.loadout.evs}
+                            </div>
+                            <div style={{ fontSize: '0.56rem', color: 'var(--pk-text-dim)' }}>
+                              {counter.loadout.nature} Nature
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem', marginTop: '0.15rem' }}>
+                              {counter.loadout.moves.map((move) => (
+                                <span key={move} style={{ fontSize: '0.58rem', color: 'var(--pk-text-muted)' }}>- {move}</span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     );
                   })}

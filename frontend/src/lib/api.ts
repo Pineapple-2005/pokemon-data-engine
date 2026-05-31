@@ -17,7 +17,7 @@ import type {
 } from '@/types';
 import { getAuthHeader } from './auth';
 
-const BASE = '/api';
+const BASE = process.env.NEXT_PUBLIC_API_URL || '/api';
 
 /** All NestJS responses are wrapped in { success: true, data: T }. */
 interface ApiEnvelope<T> { success: boolean; data: T }
@@ -37,6 +37,17 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   });
   if (!res.ok) {
     const text = await res.text().catch(() => res.statusText);
+    try {
+      const payload = JSON.parse(text) as { error?: unknown; message?: unknown };
+      const message = payload.error ?? payload.message;
+      if (typeof message === 'string') throw new Error(message);
+      if (Array.isArray(message)) throw new Error(message.join(', '));
+    } catch (err) {
+      if (err instanceof SyntaxError) {
+        throw new Error(text || `HTTP ${res.status}`);
+      }
+      throw err;
+    }
     throw new Error(text || `HTTP ${res.status}`);
   }
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
@@ -102,10 +113,23 @@ export const api = {
     gymLeaderName?: string,
     section?: string,
     groupName?: string,
+    previousTeam?: string[],
+    previousLineups?: string[][],
+    variationSeed?: number,
   ): Promise<Engine1Response> {
     return request<Engine1Response>('/engine1/generate', {
       method: 'POST',
-      body: JSON.stringify({ theme, difficulty, region, gym_leader_name: gymLeaderName, section, group_name: groupName }),
+      body: JSON.stringify({
+        theme,
+        difficulty,
+        region,
+        gym_leader_name: gymLeaderName,
+        section,
+        group_name: groupName,
+        previous_team: previousTeam,
+        previous_lineups: previousLineups,
+        variation_seed: variationSeed,
+      }),
     });
   },
 

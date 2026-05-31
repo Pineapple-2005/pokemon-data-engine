@@ -3,6 +3,7 @@ import {
   Logger,
   NotFoundException,
   ConflictException,
+  BadRequestException,
 } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { MlClientService, Engine3PredictResponse, MlModelMetrics } from '../ml/ml-client.service';
@@ -11,6 +12,7 @@ import {
   GroundTruth,
   PredictionWithResult,
 } from '../common/interfaces/pokemon.interface';
+import { normalizePokemonName } from '../pokemon/showdown.parser';
 
 /** Flat metrics shape consumed by the frontend ModelMetrics interface */
 export interface FlatModelMetrics {
@@ -91,9 +93,32 @@ export class Engine3Service {
       });
     }
 
-    // Fetch team data from the DB
-    const teamAData = await this.db.findPokemonByNames(team_a);
-    const teamBData = await this.db.findPokemonByNames(team_b);
+    const normalizedTeamA = team_a.map(normalizePokemonName).filter(Boolean);
+    const normalizedTeamB = team_b.map(normalizePokemonName).filter(Boolean);
+    if (normalizedTeamA.length === 0 || normalizedTeamB.length === 0) {
+      throw new BadRequestException({
+        success: false,
+        error: 'Each team needs at least one valid Pokémon name.',
+      });
+    }
+
+    // Reject imported names that cannot be resolved before calling the ML service.
+    const teamAData = await this.db.findPokemonByNames(normalizedTeamA);
+    const teamBData = await this.db.findPokemonByNames(normalizedTeamB);
+    const foundA = new Set(teamAData.map((pokemon) => pokemon.name.toLowerCase()));
+    const foundB = new Set(teamBData.map((pokemon) => pokemon.name.toLowerCase()));
+    const missingA = normalizedTeamA.filter((name) => !foundA.has(name));
+    const missingB = normalizedTeamB.filter((name) => !foundB.has(name));
+    if (missingA.length > 0 || missingB.length > 0) {
+      const details = [
+        missingA.length > 0 ? `Team A: ${missingA.join(', ')}` : '',
+        missingB.length > 0 ? `Team B: ${missingB.join(', ')}` : '',
+      ].filter(Boolean);
+      throw new BadRequestException({
+        success: false,
+        error: `Unknown Pokémon name${missingA.length + missingB.length === 1 ? '' : 's'}: ${details.join('; ')}`,
+      });
+    }
 
     this.logger.log(
       `Engine3.predict: match=${match_id} teamA=${teamAData.length} teamB=${teamBData.length}`,
@@ -131,8 +156,8 @@ export class Engine3Service {
       confidence_score: mlResult.confidence,
       prediction_reason: mlResult.reason,
       model_used: mlResult.model_used ?? 'ml-service',
-      team_a: JSON.stringify(team_a),
-      team_b: JSON.stringify(team_b),
+      team_a: JSON.stringify(normalizedTeamA),
+      team_b: JSON.stringify(normalizedTeamB),
       user_id: userId,
     });
 

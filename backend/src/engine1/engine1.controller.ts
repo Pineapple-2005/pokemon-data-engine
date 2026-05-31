@@ -11,7 +11,7 @@ import {
   UseGuards,
   Request,
 } from '@nestjs/common';
-import { IsString, IsNotEmpty, IsIn, IsOptional } from 'class-validator';
+import { IsString, IsNotEmpty, IsIn, IsOptional, IsArray, IsInt } from 'class-validator';
 import { Engine1Service } from './engine1.service';
 import { Engine1Response } from '../ml/ml-client.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -41,6 +41,19 @@ class GenerateTeamDto {
   @IsString()
   @IsOptional()
   gym_leader_name?: string;
+
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  previous_team?: string[];
+
+  @IsArray()
+  @IsOptional()
+  previous_lineups?: string[][];
+
+  @IsInt()
+  @IsOptional()
+  variation_seed?: number;
 }
 
 @Controller('engine1')

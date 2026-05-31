@@ -81,6 +81,37 @@ def _normalize_matrix(X: np.ndarray) -> tuple[np.ndarray, MinMaxScaler]:
     return X_scaled, scaler
 
 
+def _weighted_quality_pick(
+    candidates: list[dict],
+    score_fn,
+    rng: random.Random,
+    avoid_names: Optional[set[str]] = None,
+    quality_window: float = 0.10,
+    max_candidates: int = 5,
+) -> Optional[dict]:
+    """Choose among near-best candidates while preferring a fresh lineup."""
+    if not candidates:
+        return None
+
+    scored = sorted(
+        [(candidate, float(score_fn(candidate))) for candidate in candidates],
+        key=lambda item: item[1],
+        reverse=True,
+    )
+    best_score = scored[0][1]
+    eligible = [
+        item for item in scored
+        if item[1] >= best_score - quality_window
+    ][:max_candidates]
+
+    avoid_names = avoid_names or set()
+    fresh = [item for item in eligible if item[0].get("name") not in avoid_names]
+    pool = fresh or eligible
+    floor = min(score for _, score in pool)
+    weights = [1.0 + max(0.0, score - floor) * 8.0 for _, score in pool]
+    return rng.choices([candidate for candidate, _ in pool], weights=weights, k=1)[0]
+
+
 # ---------------------------------------------------------------------------
 # Gower distance (categorical + numeric mixed, here pure numeric)
 # ---------------------------------------------------------------------------
@@ -159,6 +190,9 @@ def generate_team(
     theme: str,
     difficulty: str,
     pokemon_pool: list[dict],
+    previous_team: Optional[list[str]] = None,
+    previous_lineups: Optional[list[list[str]]] = None,
+    variation_seed: Optional[int] = None,
 ) -> dict:
     """
     Core logic for Engine 1.
@@ -175,6 +209,12 @@ def generate_team(
     """
     theme = theme.lower()
     difficulty = difficulty.lower()
+    previous_names = {name.lower() for name in (previous_team or [])}
+    known_lineups = {
+        frozenset(name.lower() for name in lineup)
+        for lineup in (previous_lineups or [])
+    }
+    rng = random.Random(variation_seed)
 
     if not pokemon_pool:
         raise ValueError("No Pokémon available for theme")
@@ -312,8 +352,17 @@ def generate_team(
     for i, p in enumerate(working_pool):
         p["_cos_sim"] = float(cos_sims[i])
 
-    # Ace = highest cosine similarity to theme centroid
-    ace_idx = int(np.argmax(cos_sims))
+    # Ace = one of the near-best theme fits. This preserves quality while
+    # allowing repeat generations to rotate among tournament-worthy options.
+    ace_pick = _weighted_quality_pick(
+        working_pool,
+        lambda p: 0.70 * p["_cos_sim"] + 0.30 * p["_usefulness_score"],
+        rng,
+        avoid_names=previous_names,
+        quality_window=0.08,
+        max_candidates=4,
+    )
+    ace_idx = ace_pick["_original_index"] if ace_pick is not None else int(np.argmax(cos_sims))
     working_pool[ace_idx]["_role"] = "ace"
 
     # ------------------------------------------------------------------
@@ -343,13 +392,29 @@ def generate_team(
         ]
         if not candidates:
             return None
-        if selected_indices:
-            # Gower diversity
-            cand_idxs = [p["_original_index"] for p in candidates]
-            best_idx = _most_diverse_candidate(selected_indices, cand_idxs, X_raw)
-            return next(p for p in candidates if p["_original_index"] == best_idx)
-        else:
-            return candidates[0]
+
+        def _candidate_score(candidate: dict) -> float:
+            diversity = 0.0
+            if selected_indices:
+                dists = np.mean(
+                    np.abs(X_raw[candidate["_original_index"]] - X_raw[selected_indices]),
+                    axis=1,
+                )
+                diversity = float(np.mean(dists))
+            return (
+                0.68 * candidate["_usefulness_score"]
+                + 0.22 * diversity
+                + 0.10 * candidate["_cos_sim"]
+            )
+
+        return _weighted_quality_pick(
+            candidates,
+            _candidate_score,
+            rng,
+            avoid_names=previous_names,
+            quality_window=0.10,
+            max_candidates=5,
+        )
 
     # Ace first
     ace_pick = _pick_for_role("ace")
@@ -369,30 +434,35 @@ def generate_team(
             break
 
     # If team still < required size, fill from remaining themed pool
-    remaining = sorted(
-        [p for p in working_pool if p["name"] not in used_names],
-        key=lambda p: p["_usefulness_score"],
-        reverse=True,
-    )
-    for p in remaining:
-        if len(selected_team) >= REQUIRED_TEAM_SIZE:
+    while len(selected_team) < REQUIRED_TEAM_SIZE:
+        remaining = [p for p in working_pool if p["name"] not in used_names]
+        pick = _weighted_quality_pick(
+            remaining,
+            lambda p: p["_usefulness_score"],
+            rng,
+            avoid_names=previous_names,
+            quality_window=0.10,
+            max_candidates=5,
+        )
+        if pick is None:
             break
-        if selected_indices:
-            selected_team.append(p)
-            selected_indices.append(p["_original_index"])
-        else:
-            selected_team.append(p)
-        used_names.add(p["name"])
+        selected_team.append(pick)
+        selected_indices.append(pick["_original_index"])
+        used_names.add(pick["name"])
 
     # Fallback: themed pool too small — fill remaining slots from full pokemon_pool
     if len(selected_team) < REQUIRED_TEAM_SIZE:
-        fallback_pool = sorted(
-            [p for p in pokemon_pool if p.get("name") not in used_names],
-            key=lambda p: _safe_float(p.get("total_base_stats", p.get("total", 300))),
-            reverse=True,
-        )
-        for p in fallback_pool:
-            if len(selected_team) >= REQUIRED_TEAM_SIZE:
+        while len(selected_team) < REQUIRED_TEAM_SIZE:
+            fallback_pool = [p for p in pokemon_pool if p.get("name") not in used_names]
+            p = _weighted_quality_pick(
+                fallback_pool,
+                lambda candidate: _safe_float(candidate.get("total_base_stats", candidate.get("total", 300))) / 600.0,
+                rng,
+                avoid_names=previous_names,
+                quality_window=0.10,
+                max_candidates=5,
+            )
+            if p is None:
                 break
             p_copy = dict(p)
             p_copy["_role"] = _heuristic_role(p)
@@ -400,6 +470,50 @@ def generate_team(
             p_copy["_cos_sim"] = 0.0
             selected_team.append(p_copy)
             used_names.add(p["name"])
+
+    # A fresh seed can occasionally choose the same four names. If viable
+    # themed alternatives exist, replace the weakest non-ace slot so clicking
+    # Generate again visibly rotates the lineup.
+    selected_name_set = {p["name"].lower() for p in selected_team}
+    if selected_name_set == previous_names or frozenset(selected_name_set) in known_lineups:
+        replaceable = [
+            (index, p) for index, p in enumerate(selected_team)
+            if p.get("_role") != "ace"
+        ]
+        if replaceable:
+            replacement_options = []
+            for replace_index, replaced in replaceable:
+                replaced_name = replaced["name"].lower()
+                for candidate in working_pool:
+                    candidate_name = candidate["name"].lower()
+                    next_lineup = frozenset(
+                        (selected_name_set - {replaced_name}) | {candidate_name}
+                    )
+                    if candidate_name in selected_name_set or next_lineup in known_lineups:
+                        continue
+                    replacement_options.append({
+                        "name": candidate["name"],
+                        "candidate": candidate,
+                        "replace_index": replace_index,
+                        "_quality_score": (
+                            candidate["_usefulness_score"]
+                            - 0.35 * max(
+                                0.0,
+                                replaced.get("_usefulness_score", 0.0)
+                                - candidate["_usefulness_score"],
+                            )
+                        ),
+                    })
+            replacement = _weighted_quality_pick(
+                replacement_options,
+                lambda option: option["_quality_score"],
+                rng,
+                avoid_names=previous_names,
+                quality_window=0.10,
+                max_candidates=5,
+            )
+            if replacement is not None:
+                selected_team[replacement["replace_index"]] = replacement["candidate"]
 
     # ------------------------------------------------------------------
     # Step 9 — Build output
@@ -411,6 +525,7 @@ def generate_team(
             "slot": slot_num,
             "role": role,
             "name": p.get("name", "unknown"),
+            "pokeapi_id": p.get("pokeapi_id"),
             "type_1": p.get("type_1"),
             "type_2": p.get("type_2"),
             "total_base_stats": int(_safe_float(p.get("total_base_stats", p.get("total", 0)))),
@@ -426,6 +541,7 @@ def generate_team(
         f"Difficulty: {difficulty}. "
         f"Assembly used KMeans clustering, Decision Tree role assignment, "
         f"Random Forest usefulness scoring, and Gower diversity enforcement."
+        f" Repeat generations rotate among near-best candidates."
     )
 
     return {

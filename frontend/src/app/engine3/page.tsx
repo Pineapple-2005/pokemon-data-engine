@@ -6,6 +6,8 @@ import { PredictionResult } from '@/components/engines/PredictionResult';
 import { AuthGuard } from '@/components/ui/AuthGuard';
 import { PokemonAutocomplete } from '@/components/ui/PokemonAutocomplete';
 import { api } from '@/lib/api';
+import { parsePokemonCsv, parseShowdownTeam } from '@/lib/pokemon-import';
+import { useSessionState } from '@/hooks/useSessionState';
 import type { Engine3Response } from '@/types';
 
 /* ── Gen 1 Pokémon list ─────────────────────────────────── */
@@ -117,17 +119,7 @@ function TeamInput({
     const reader = new FileReader();
     reader.onload = (ev) => {
       const text = ev.target?.result as string;
-      const lines = text.split('\n').filter(Boolean);
-      const hasHeader = lines[0]?.toLowerCase().includes('name');
-      const dataLines = hasHeader ? lines.slice(1) : lines;
-      const names = dataLines
-        .map((l) => {
-          const cols = l.split(',');
-          const nameCol = hasHeader ? cols[1] : cols[0];
-          return (nameCol ?? '').replace(/"/g, '').trim();
-        })
-        .filter(Boolean)
-        .slice(0, 4);
+      const names = parsePokemonCsv(text);
       onImport?.(names);
     };
     reader.readAsText(file);
@@ -135,14 +127,7 @@ function TeamInput({
   }
 
   function handlePasteLoad() {
-    const names: string[] = [];
-    for (const line of pasteText.split('\n')) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith('-') || trimmed.startsWith('===')) continue;
-      const cleaned = trimmed.replace(/ @.*/, '').replace(/\(.*?\)/, '').trim();
-      if (cleaned) names.push(cleaned);
-      if (names.length === 4) break;
-    }
+    const names = parseShowdownTeam(pasteText);
     if (names.length > 0) { onImport?.(names); setPasteOpen(false); setPasteText(''); }
   }
 
@@ -273,20 +258,20 @@ function BattleFlash({ active }: { readonly active: boolean }) {
 }
 
 export default function Engine3Page() {
-  const [battlerA, setBattlerA] = useState('');
-  const [battlerB, setBattlerB] = useState('');
-  const [teamA, setTeamA] = useState<string[]>(['', '', '', '']);
-  const [teamB, setTeamB] = useState<string[]>(['', '', '', '']);
+  const [battlerA, setBattlerA] = useSessionState('engine3.battlerA', '');
+  const [battlerB, setBattlerB] = useSessionState('engine3.battlerB', '');
+  const [teamA, setTeamA] = useSessionState<string[]>('engine3.teamA', ['', '', '', '']);
+  const [teamB, setTeamB] = useSessionState<string[]>('engine3.teamB', ['', '', '', '']);
   const [loading, setLoading] = useState(false);
-  const [prediction, setPrediction] = useState<Engine3Response | null>(null);
-  const [currentMatchId, setCurrentMatchId] = useState('');
+  const [prediction, setPrediction] = useSessionState<Engine3Response | null>('engine3.prediction', null);
+  const [currentMatchId, setCurrentMatchId] = useSessionState('engine3.currentMatchId', '');
   const [predError, setPredError] = useState<string | null>(null);
-  const [actualWinner, setActualWinner] = useState('');
-  const [replayLink, setReplayLink] = useState('');
-  const [screenshotLink, setScreenshotLink] = useState('');
-  const [finalScore, setFinalScore] = useState('');
+  const [actualWinner, setActualWinner] = useSessionState('engine3.actualWinner', '');
+  const [replayLink, setReplayLink] = useSessionState('engine3.replayLink', '');
+  const [screenshotLink, setScreenshotLink] = useSessionState('engine3.screenshotLink', '');
+  const [finalScore, setFinalScore] = useSessionState('engine3.finalScore', '');
   const [recording, setRecording] = useState(false);
-  const [recorded, setRecorded] = useState(false);
+  const [recorded, setRecorded] = useSessionState('engine3.recorded', false);
   const [recordError, setRecordError] = useState<string | null>(null);
   const [flashActive, setFlashActive] = useState(false);
   const [gymTeamToast, setGymTeamToast] = useState(false);

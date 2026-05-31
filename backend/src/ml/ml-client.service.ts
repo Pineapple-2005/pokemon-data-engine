@@ -10,11 +10,21 @@ export interface TeamSlot {
   slot: number;
   role: string;
   name: string;
+  pokeapi_id?: number;
   type_1?: string;
   type_2?: string;
   total_base_stats: number;
   usefulness_score: number;
   reason: string;
+  loadout?: TournamentLoadout;
+}
+
+export interface TournamentLoadout {
+  item: string;
+  ability: string;
+  evs: string;
+  nature: string;
+  moves: [string, string, string, string];
 }
 
 export interface Engine1Response {
@@ -24,6 +34,7 @@ export interface Engine1Response {
   model_used: string;
   metrics: { silhouette_score: number; cluster_count: number; pool_size: number };
   explanation: string;   // Python returns 'explanation', not 'reasoning'
+  showdown_text?: string;
 }
 
 export interface CounterScoreBreakdown {
@@ -44,6 +55,8 @@ export interface CounterRecommendation {
   total_base_stats: number;
   reason: string;
   pokeapi_id?: number;
+  role?: string;
+  loadout?: TournamentLoadout;
 }
 
 export interface Engine2Response {
@@ -52,6 +65,7 @@ export interface Engine2Response {
   model_used: string;
   matchup_table: Record<string, { advantage: string; multiplier: number }>;
   opponent_team_data?: { name: string; pokeapi_id?: number; type_1?: string; type_2?: string }[];
+  showdown_text?: string;
 }
 
 export interface Engine3PredictResponse {
@@ -139,6 +153,18 @@ export class MlClientService {
         return await fn();
       } catch (err) {
         lastError = err as Error;
+        if (axios.isAxiosError(err) && err.response?.status && err.response.status >= 400 && err.response.status < 500) {
+          const detail = err.response.data?.detail;
+          const message = typeof detail === 'string'
+            ? detail
+            : Array.isArray(detail)
+              ? detail.map((entry) => entry.msg ?? JSON.stringify(entry)).join('; ')
+              : err.message;
+          throw new HttpException(
+            { success: false, error: message },
+            err.response.status,
+          );
+        }
 
         if (attempt < retries) {
           const delay = delaysMs[attempt] ?? 1000;
@@ -165,16 +191,24 @@ export class MlClientService {
     difficulty: string,
     pokemonPool: Pokemon[],
     region?: string,
+    previousTeam: string[] = [],
+    previousLineups: string[][] = [],
+    variationSeed?: number,
   ): Promise<Engine1Response> {
     return this.withRetry(async () => {
       const body: Record<string, unknown> = {
         theme,
         difficulty,
         pokemon_pool: pokemonPool,
+        previous_team: previousTeam,
+        previous_lineups: previousLineups,
       };
       // Pass region through so the ML service can use it when available
       if (region !== undefined) {
         body['region'] = region;
+      }
+      if (variationSeed !== undefined) {
+        body['variation_seed'] = variationSeed;
       }
       const { data } = await this.http.post<Engine1Response>('/engine1/generate', body);
       return data;
