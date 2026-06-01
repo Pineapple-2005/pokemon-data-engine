@@ -41,7 +41,7 @@ SCALED_COLS = ["hp_scaled", "attack_scaled", "defense_scaled",
 
 # Role slot definitions for team assembly
 ROLE_SLOTS = ["ace", "sweeper", "tank", "wall", "support", "balanced"]
-REQUIRED_TEAM_SIZE = 4
+REQUIRED_TEAM_SIZE = 6
 
 # Difficulty stat percentile cutoffs (select from this fraction of the pool)
 DIFFICULTY_CONFIG = {
