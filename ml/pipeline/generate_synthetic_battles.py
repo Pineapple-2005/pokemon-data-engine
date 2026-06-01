@@ -13,7 +13,8 @@ Output: data/processed/synthetic_battles.csv
 
 Columns:
     speed_adv, stat_adv, coverage_adv, weakness_adv, hp_adv, atk_adv,
-    sp_atk_adv, def_adv, type_diversity_adv, role_balance_a, winner
+    sp_atk_adv, def_adv, type_diversity_adv, role_balance_adv, matchup_adv,
+    speed_control_adv, dmg_matchup_adv, winner
     (winner: 0 = team A wins, 1 = team B wins)
 """
 
@@ -36,12 +37,18 @@ load_dotenv(_ML_DIR / ".env")
 
 sys.path.insert(0, str(_ML_DIR))
 
-from utils.feature_builder import build_team_features, get_team_type_coverage
+from utils.feature_builder import (
+    build_team_features,
+    get_team_type_coverage,
+    _team_matchup_score,
+    _speed_control,
+    _dmg_matchup,
+)
 
 logger = logging.getLogger(__name__)
 
 # Team size for each simulated battle
-TEAM_SIZE = 6
+TEAM_SIZE = 4
 
 
 # ---------------------------------------------------------------------------
@@ -53,17 +60,15 @@ def generate_battle(team_a: list[dict], team_b: list[dict]) -> dict:
     Simulate a battle between two teams using a deterministic scoring formula.
 
     Score formula (positive = team A wins):
-        0.4 * (avg_total_a - avg_total_b) / 600
-      + 0.3 * (avg_speed_a - avg_speed_b) / 130
-      + 0.2 * (coverage_a - coverage_b)   / 18
-      + 0.1 * random.uniform(-1, 1)
+        0.25 * stat + 0.20 * dmg_matchup + 0.15 * matchup
+      + 0.15 * speed_control + 0.10 * coverage + 0.05 * speed + 0.10 * random
 
     Args:
         team_a: List of Pokémon feature dicts for team A (must have total_base_stats, speed, type_1/2).
         team_b: List of Pokémon feature dicts for team B.
 
     Returns:
-        Dict with 10 feature columns + 'winner' (0 = A wins, 1 = B wins).
+        Dict with 13 feature columns + 'winner' (0 = A wins, 1 = B wins).
     """
     def safe_avg(team: list[dict], key: str) -> float:
         vals = [v for p in team if (v := p.get(key)) is not None]
@@ -76,11 +81,18 @@ def generate_battle(team_a: list[dict], team_b: list[dict]) -> dict:
     coverage_a  = get_team_type_coverage(team_a)
     coverage_b  = get_team_type_coverage(team_b)
 
+    matchup       = _team_matchup_score(team_a, team_b) - _team_matchup_score(team_b, team_a)
+    speed_control = _speed_control(team_a, team_b) - _speed_control(team_b, team_a)
+    dmg_matchup   = _dmg_matchup(team_a, team_b) - _dmg_matchup(team_b, team_a)
+
     score = (
-        0.4 * (avg_total_a - avg_total_b) / 600.0
-        + 0.3 * (avg_speed_a - avg_speed_b) / 130.0
-        + 0.2 * (coverage_a - coverage_b) / 18.0
-        + 0.1 * random.uniform(-1.0, 1.0)
+        0.25 * (avg_total_a - avg_total_b) / 600.0
+        + 0.20 * dmg_matchup / 3.0
+        + 0.15 * matchup / 2.0
+        + 0.15 * speed_control / 4.0
+        + 0.10 * (coverage_a - coverage_b) / 18.0
+        + 0.05 * (avg_speed_a - avg_speed_b) / 130.0
+        + 0.10 * random.uniform(-1.0, 1.0)
     )
 
     winner = 0 if score > 0 else 1  # 0 = A wins, 1 = B wins
@@ -163,7 +175,7 @@ def run_generation(
     random.seed(seed)
 
     # Resolve paths
-    db_file = _ML_DIR / db_path.lstrip("./")
+    db_file = (_ML_DIR / db_path).resolve()
     if not db_file.exists():
         print(f"ERROR: Database not found at {db_file}. Run run_pipeline.py first.")
         sys.exit(1)
@@ -206,7 +218,8 @@ def run_generation(
     output_columns = [
         "speed_adv", "stat_adv", "coverage_adv", "weakness_adv",
         "hp_adv", "atk_adv", "sp_atk_adv", "def_adv",
-        "type_diversity_adv", "role_balance_a", "winner"
+        "type_diversity_adv", "role_balance_adv", "matchup_adv",
+        "speed_control_adv", "dmg_matchup_adv", "winner",
     ]
     for col in output_columns:
         if col not in df.columns:

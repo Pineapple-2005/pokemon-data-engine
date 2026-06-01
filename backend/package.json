@@ -5,15 +5,16 @@
   "main": "dist/main.js",
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "start": "node dist/main",
-    "start:dev": "ts-node -r tsconfig-paths/register src/main.ts",
-    "start:prod": "node dist/main.js"
+    "start": "node --use-system-ca dist/main",
+    "start:dev": "node --use-system-ca -r ts-node/register -r tsconfig-paths/register src/main.ts",
+    "start:prod": "node --use-system-ca dist/main.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.100.1",
     "@nestjs/common": "^11.1.24",
     "@nestjs/config": "^4.0.4",
     "@nestjs/core": "^11.1.24",

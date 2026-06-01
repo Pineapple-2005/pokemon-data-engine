@@ -1,7 +1,7 @@
 # Pokémon Data Engine — System Guide
 
-> **Version:** 1.0 · **Date:** 2026-05-28  
-> **Stack:** Next.js 14 (frontend) · NestJS (backend API) · Python FastAPI (ML service) · SQLite
+> **Version:** 2.0 · **Date:** 2026-05-30
+> **Stack:** Next.js 14 · NestJS · Python FastAPI · Supabase PostgreSQL · Anthropic Claude API
 
 ---
 
@@ -9,659 +9,631 @@
 
 1. [System Overview](#1-system-overview)
 2. [Starting the System](#2-starting-the-system)
-3. [Engine 1 — Gym Leader Team Builder](#3-engine-1--gym-leader-team-builder)
-4. [Engine 2 — Counter-Pick Engine](#4-engine-2--counter-pick-engine)
-5. [Engine 3 — Battle Predictor](#5-engine-3--battle-predictor)
-6. [Battle History & CSV Export/Import](#6-battle-history--csv-exportimport)
-7. [Model Metrics](#7-model-metrics)
-8. [Pokémon DB](#8-pokémon-db)
-9. [Pokémon Showdown Integration](#9-pokémon-showdown-integration)
-10. [Backend Logic Notes](#10-backend-logic-notes)
-11. [Database Schema Reference](#11-database-schema-reference)
-12. [Required Information Checklist](#12-required-information-checklist)
+3. [User Accounts & Trainer Profiles](#3-user-accounts--trainer-profiles)
+4. [Engine 01 — The Forge](#4-engine-01--the-forge)
+5. [Engine 02 — The Counter](#5-engine-02--the-counter)
+6. [Engine 03 — The Oracle](#6-engine-03--the-oracle)
+7. [Engine 04 — The Archive](#7-engine-04--the-archive)
+8. [Engine 05 — The Commentator](#8-engine-05--the-commentator)
+9. [Engine 06 — The Pokedex AI](#9-engine-06--the-pokedex-ai)
+10. [Engine 07 — The Exporter](#10-engine-07--the-exporter)
+11. [Engine 08 — The Wall](#11-engine-08--the-wall)
+12. [Engine 09 — The Scanner](#12-engine-09--the-scanner)
+13. [Engine 10 — The Replay](#13-engine-10--the-replay)
+14. [Pokémon Showdown Integration](#14-pokémon-showdown-integration)
+15. [Dashboard](#15-dashboard)
+16. [Battle History & Model Metrics](#16-battle-history--model-metrics)
+17. [Pokémon DB & Pool Management](#17-pokémon-db--pool-management)
+18. [Database Schema Reference](#18-database-schema-reference)
+19. [Known Issues & Notes](#19-known-issues--notes)
 
 ---
 
 ## 1. System Overview
 
-The Pokémon Data Engine is a three-engine data mining and machine learning platform that analyses Pokémon battle data. It uses the official Pokémon API as its primary data source and synthetic battle data for model training.
-
-(See Mermaid diagram above for the visual pipeline)
+The Pokémon Data Engine is a 10-engine data mining and machine learning platform built around Gen 1 Pokémon battle data. It combines ML algorithms, AI language models, and live Pokémon Showdown integration into one dashboard.
 
 **Service Architecture:**
-- **User Browser** (Next.js :3000) → **NestJS API** (:3001) ← business logic, DB reads/writes, audit logging
-- **NestJS API** → **SQLite** (`pokemon.db`) ← all persistent state
-- **NestJS API** → **Python FastAPI** (:8000) ← all ML computations → `ml/models/` ← serialised model weights (joblib .pkl)
 
-## Data Pipeline Diagram
+```
+Browser (Next.js :3000)
+        │
+        ▼
+NestJS API (:3001) ─── Supabase PostgreSQL
+        │
+        ▼
+Python FastAPI (:8000) ─── ml/models/ (.pkl files)
+        │
+        ▼
+Anthropic Claude API (Engines 5 & 6)
+Pokémon Showdown API (Engines 7, 10, Replay Sync)
+```
+
+**Data Pipeline:**
 
 ```mermaid
 flowchart TD
-    A([🌐 PokéAPI\npokeapi.co/api/v2]) -->|fetch limit=151| B[📥 Data Retrieval\nextract.py]
-    B -->|raw JSON cache| C[🗺️ Native Region Mapping\ntransform.py\nGen 1 → Kanto]
-    C -->|region tagged| D[🚫 Restriction Filtering\ntransform.py\nExclude Legendary · Mythical\nMega · Alolan forms]
-    D -->|clean pool| E[🧹 Data Cleaning\ntransform.py\nparse stats · handle duals\nnormalize names]
-    E -->|cleaned rows| F[⚙️ Feature Engineering\ntransform.py\nmin-max scaling · def matchups\nrole labels · type coverage]
-    F -->|featured DataFrame| G[💾 Load to SQLite\nload.py\npokemon_data table\n151 rows]
-
-    G --> H1[🏟️ Engine 1\nGym Team Builder\nK-Means · Decision Tree\nRandom Forest]
-    G --> H2[🎯 Engine 2\nCounter Pick\nK-NN · Type Coverage\nStat Scoring]
-    G --> H3[⚔️ Engine 3\nBattle Predictor\nDT · RF · KNN · NB · LR\n5-model Ensemble]
-
-    H1 -->|generated team| I[📤 Engine Output\nengine_output table\nnative_region_validation]
-    H2 -->|counter picks| I
-    H3 -->|predicted winner\nconfidence score| J[🔒 Prediction Log\nprediction table\nlocked before battle]
-
-    I --> K[🎮 Pokémon Showdown\nTeams exported &\nbattle played]
-    J --> K
-
-    K -->|actual result| L[✅ Ground Truth Log\nground_truth table\nactual_winner · correct_prediction\nreplay_link · num_turns]
-
-    L --> M[📊 Metrics & Analytics\nAccuracy · F1 · Brier Score\nConfusion Matrix\nAccuracy-over-time chart]
-    L --> N[📋 Audit Trail\naudit_log table\ntimestamped every action]
-
-    M --> O[📄 Documentation\nSYSTEM_GUIDE.md\nIn-app Guide Modal]
-    N --> O
-
-    style A fill:#1a6060,color:#fff,stroke:#78C850
-    style G fill:#0d1120,color:#F8D030,stroke:#F8D030
-    style H1 fill:#1a1a2e,color:#F08030,stroke:#F08030
-    style H2 fill:#1a1a2e,color:#6890F0,stroke:#6890F0
-    style H3 fill:#1a1a2e,color:#EF4444,stroke:#EF4444
-    style K fill:#2d1b00,color:#F8D030,stroke:#F8D030
-    style L fill:#0a2e0a,color:#78C850,stroke:#78C850
-    style M fill:#0d1120,color:#A890F0,stroke:#A890F0
-    style O fill:#1a0a2e,color:#EE99AC,stroke:#EE99AC
+    A([PokéAPI]) -->|151 Gen 1 Pokémon| B[ETL Pipeline\nml/pipeline/]
+    B --> C[Supabase PostgreSQL\npokemon_data table]
+    C --> E1[Engine 01 — The Forge\nGym Team Builder]
+    C --> E2[Engine 02 — The Counter\nCounter Pick]
+    C --> E3[Engine 03 — The Oracle\nBattle Predictor]
+    E3 -->|prediction locked| D[prediction table]
+    D -->|after battle| E[ground_truth table]
+    E --> F[Engine 04 — The Archive\nLeaderboard + Stats]
+    E --> G[Engine 05 — The Commentator\nAI Commentary]
 ```
-
-**Data Sources:**
-| Source | Used By | What it Provides |
-|--------|---------|-----------------|
-| PokeAPI (REST) | Pipeline (`ml/pipeline/`) | 151 Gen 1 Pokémon stats, types, abilities |
-| `pokemon.db` | All engines | Pre-enriched Pokémon with scaled stats, role labels, type coverage |
-| `ml/data/processed/synthetic_battles.csv` | Engine 3 | 2 000+ synthetic battle outcomes for initial training |
-| Battle History (ground truth) | Engine 3 retrain | Real outcomes appended post-battle |
 
 ---
 
 ## 2. Starting the System
 
-Open **three** terminal windows:
+### Prerequisites
+- Node.js 18+, Python 3.10+, pip
+- A Supabase project with PostgreSQL
+- An Anthropic API key (for Engines 5 & 6)
 
+### Environment Setup
+
+Create `backend/.env`:
+```env
+PORT=3001
+DB_HOST=your-supabase-host.supabase.co
+DB_PORT=5432
+DB_USER=postgres
+DB_PASSWORD=your-password
+DB_NAME=postgres
+ML_SERVICE_URL=http://localhost:8000
+NODE_ENV=development
+CORS_ORIGIN=http://localhost:3000
+JWT_SECRET=your-secret-key
+JWT_EXPIRES_IN=7d
+ANTHROPIC_API_KEY=sk-ant-...
+```
+
+### Database Seeding (run once)
 ```bash
-# Terminal 1 — Python ML service
 cd ml
-.venv\Scripts\activate          # Windows
-uvicorn api.main:app --port 8000 --reload
-
-# Terminal 2 — NestJS backend
-cd backend
-npm run start:dev
-
-# Terminal 3 — Next.js frontend
-cd frontend
-npm run dev
+pip install -r requirements.txt
+python pipeline/run_pipeline.py --limit 151
+python pipeline/generate_synthetic_battles.py --n-battles 500
 ```
 
-Open: **http://localhost:3000**
-
-> **Note:** The ML service auto-trains Engine 3 models on first start if `ml/models/` is empty.
-
----
-
-## 3. Engine 1 — Gym Leader Team Builder
-
-### What It Does
-Generates an optimised 6-Pokémon team for a Gym Leader given a type theme and difficulty.
-
-### Navigation
-Sidebar → **Gym Team Builder** (#03)
-
-### Inputs
-| Field | Values | Notes |
-|-------|--------|-------|
-| Type Theme | Any of the 18 Pokémon types, or "Balanced" | Filters the pool to matching type_1 or type_2 |
-| Difficulty | Easy / Medium / Hard | Controls stat percentile cutoff |
-
-### Difficulty Scaling
-| Level | Pool Filter |
-|-------|------------|
-| Easy | Bottom 0–40th percentile of total_base_stats |
-| Medium | 30–70th percentile |
-| Hard | Top 60–100th percentile |
-
-### Processing Pipeline (5 stages)
-
-| Stage | Algorithm | Purpose |
-|-------|-----------|---------|
-| 1. Filter | Type match + difficulty percentile | Narrow pool to eligible Pokémon |
-| 2. Cluster | **K-Means** (k=5) on 6 stat features | Group Pokémon into role archetypes |
-| 3. Role Assignment | **Decision Tree** (max_depth=5) | Predict role for each Pokémon |
-| 4. Usefulness Score | **Random Forest** (50 estimators) | Score top-half by total BST |
-| 5. Team Assembly | **Cosine Similarity** + **Gower Distance** | Pick Ace + 5 diverse roles |
-
-### Features Used
-`hp`, `attack`, `defense`, `sp_atk`, `sp_def`, `speed` (normalised to [0,1] via MinMaxScaler)
-
-### Model Used
-`kmeans+dt+rf+cosine+gower`
-
-### Output
-```json
-{
-  "theme": "fire",
-  "difficulty": "hard",
-  "team": [
-    {
-      "slot": 1,
-      "role": "ace",
-      "name": "arcanine",
-      "type_1": "fire",
-      "type_2": null,
-      "total_base_stats": 555,
-      "usefulness_score": 0.8234,
-      "reason": "Arcanine (fire, BST 555) selected as ace. Highest cosine similarity (0.94) to fire theme centroid."
-    }
-    // ... 5 more slots
-  ],
-  "model_used": "kmeans+dt+rf+cosine+gower",
-  "metrics": {
-    "silhouette_score": 0.2341,
-    "cluster_count": 5,
-    "pool_size": 23
-  },
-  "explanation": "Team built around Fire theme with roles: ..."
-}
-```
-
-### Metrics Produced
-- **Silhouette Score** — cluster quality (0 = random, 1 = perfect separation)
-- **Cluster count** and **Pool size** — shown in explanation
-
-### Graphs / Tables
-- Team grid (6 cards) with type badges, stat bar, role label
-- Cry button (plays PokeAPI `.ogg` audio)
-
----
-
-## 4. Engine 2 — Counter-Pick Engine
-
-### What It Does
-Given an opponent's team (up to 6 Pokémon), recommends the 6 best counter picks from the assigned pool using type effectiveness and stat analysis.
-
-### Navigation
-Sidebar → **Counter Pick** (#04)
-
-### Inputs
-| Field | Notes |
-|-------|-------|
-| Pokémon 1–6 | Lowercase names matching the database (e.g. `charizard`, `pikachu`) |
-
-### Processing Pipeline (4 stages)
-
-| Stage | Algorithm | Purpose |
-|-------|-----------|---------|
-| 1. Score features | Type Coverage Score (TCS), Stat Advantage Score (SAS), Resistance Score (RS) | Rule-based scoring |
-| 2. Train models | **K-NN** (k=5), **Decision Tree** (max_depth=4) | Learn "strong counter" classification from pool |
-| 3. Composite score | Weighted sum | Rank all candidates |
-| 4. Matchup table | TYPE_CHART lookup | Show multipliers for top-3 counters |
-
-### Scoring Formula
-```
-Final = 0.40 × TCS  +  0.25 × KNN_prob  +  0.20 × SAS_norm  +  0.15 × DT_prob
-```
-
-| Component | Weight | Description |
-|-----------|--------|-------------|
-| TCS | 40% | Type effectiveness score vs opponent team |
-| KNN | 25% | K-NN strong-counter probability |
-| SAS | 20% | Stat advantage (normalised from [-1,1] to [0,1]) |
-| DT | 15% | Decision Tree strong-counter probability |
-
-### Features Used (10-dimensional vector)
-`hp`, `attack`, `defense`, `sp_atk`, `sp_def`, `speed` (normalised by stat maxima), `total_base_stats/700`, plus 3 padding zeros.
-
-### Data Source
-- Opponent data: `pokemon_data` table (looked up by name)
-- Counter candidates: `pokemon_data WHERE is_assigned = 1`
-
-### Model Used
-`tcs+knn+dt+gower`
-
-### Output
-- **Recommended Counters** (top 6 ranked cards) with score breakdown (TCS%, SAS%, RS%, KNN%, DT%)
-- **Type Matchup Table** — matrix of top-6 counters vs all opponents (2×, 1×, <1×, ✗)
-
-### Metrics Produced
-- **Counter Success Rate** — `(battles where counter recommendation won) / total counter sessions`
-- Per-counter score breakdown visible in the card UI
-
----
-
-## 5. Engine 3 — Battle Predictor
-
-### What It Does
-Before a battle begins, predicts the winner between two trainers using a 5-model ML ensemble. After the battle, records the actual result to evaluate model accuracy and trigger retraining.
-
-### Navigation
-Sidebar → **Battle Predictor** (#05)
-
-### Workflow
-
-```
-1. Fill TEAM A (trainer name + up to 6 Pokémon)
-2. Fill TEAM B (trainer name + up to 6 Pokémon)
-3. Click "Predict Winner"
-   → match_id generated, prediction locked immediately
-4. Battle is played (outside this system)
-5. Return to page, find your match, click "Record Actual Result"
-   → actual winner + optional replay link saved
-   → model auto-retrain triggered
-```
-
-### Inputs
-
-**Pre-battle:**
-| Field | Required | Notes |
-|-------|----------|-------|
-| Match ID | Auto-generated | `match_XXXXXXXXXX` format |
-| Trainer A Name | Yes | e.g. `Ash` |
-| Trainer B Name | Yes | e.g. `Misty` |
-| Team A Pokémon (1–6) | Yes | Lowercase, comma-separated |
-| Team B Pokémon (1–6) | Yes | |
-
-**Post-battle (Record Result):**
-| Field | Required | Notes |
-|-------|----------|-------|
-| Actual Winner | Yes | Must match one of the trainer names |
-| Replay Link | Optional | Pokémon Showdown replay URL (see §9) |
-| Screenshot Link | Optional | Imgur or direct image URL |
-| Final Score | Optional | e.g. `6-3` |
-
-### ML Model (5-model Ensemble)
-
-| Model | Weight | Type |
-|-------|--------|------|
-| Decision Tree (max_depth=6) | 15% | `sklearn` |
-| Random Forest (100 estimators) | 35% | `sklearn` |
-| Logistic Regression (max_iter=1000) | 20% | `sklearn` |
-| Gaussian Naive Bayes | 10% | `sklearn` |
-| K-Nearest Neighbours (k=5) | 20% | `sklearn` |
-
-**Ensemble method:** Majority vote for winner; weighted probability average for confidence.
-
-### Features Used (10 differential features — Team A minus Team B)
-
-| Feature | Description |
-|---------|-------------|
-| `speed_adv` | Mean speed difference |
-| `stat_adv` | Total BST sum difference |
-| `coverage_adv` | Type coverage fraction difference |
-| `weakness_adv` | Total weakness count difference |
-| `hp_adv` | Mean HP difference |
-| `atk_adv` | Mean Attack difference |
-| `sp_atk_adv` | Mean Special Attack difference |
-| `def_adv` | Mean Defense difference |
-| `type_diversity_adv` | Unique type count difference |
-| `role_balance_a` | 1 if Team A covers all 5 roles, else 0 |
-
-### Training Data
-- Primary: `ml/data/processed/synthetic_battles.csv` (2 000+ rows, generated by `ml/pipeline/generate_synthetic_battles.py`)
-- Retrain: each new ground truth battle is appended to the CSV and all 5 models are retrained
-
-### Model Persistence
-Models serialised to `ml/models/engine3_*.pkl` via `joblib`. Loaded into an in-process cache on first request.
-
-### Output
-```json
-{
-  "match_id": "match_1779941353133",
-  "battler_a": "Ash",
-  "battler_b": "Misty",
-  "predicted_winner": "Ash",
-  "confidence": 0.8432,
-  "reason": "Team Ash wins due to: speed advantage, stat advantage, coverage advantage.",
-  "model_votes": { "dt": "Ash", "rf": "Ash", "lr": "Ash", "nb": "Misty", "knn": "Ash" },
-  "is_locked": 1,
-  "timestamp": "2026-05-28T04:09:00.000Z"
-}
-```
-
-### Metrics Used
-| Metric | Description |
-|--------|-------------|
-| Accuracy | Correct predictions / total evaluated |
-| Precision | TP / (TP + FP) |
-| Recall | TP / (TP + FN) |
-| F1 Score | Harmonic mean of precision and recall |
-| Brier Score | Mean squared probability error (lower = better) |
-| Log Loss | Cross-entropy of probability predictions (lower = better) |
-| Confusion Matrix | TP / FP / FN / TN |
-
-### Graphs / Tables Produced
-- Accuracy over time chart (requires ≥2 evaluated battles)
-- Confusion matrix with battle terminology (Super Effective / Critical Hit / Missed / Dodged)
-- Per-model accuracy breakdown
-
----
-
-## 6. Battle History & CSV Export/Import
-
-### Navigation
-Sidebar → **Battle History** (#06)
-
-### What It Shows
-All predictions joined with ground truth results:
-- Match ID, Battlers, Predicted Winner, Confidence
-- Actual Winner (or "Pending" if not yet recorded)
-- Result badge (✅ Correct / ⏳ Pending / ❌ Wrong)
-- Timestamp, Replay link
-
-### CSV Export
-
-Click **⬇ Export CSV** to download `battle_history_<timestamp>.csv`.
-
-**CSV Columns:**
-```
-Match ID, Battler A, Battler B, Predicted Winner, Confidence, Actual Winner, Correct, Replay, Timestamp
-```
-
-**Example row:**
-```csv
-"match_1779941353133","Ash","Misty","Ash","84.3","Ash","yes","","2026-05-28 04:09:00"
-```
-
-### CSV Import (Manual Process)
-
-> **Note:** Direct CSV import is not yet available through the UI. To import battle data from an external CSV, use the API directly:
-
-**Step 1** — Predict (creates the locked prediction record):
+### Starting Services
 ```bash
-curl -X POST http://localhost:3001/api/engine3/predict \
-  -H "Content-Type: application/json" \
-  -d '{
-    "match_id": "your-unique-match-id",
-    "battler_a": "TrainerA",
-    "battler_b": "TrainerB",
-    "team_a": ["charizard", "pikachu"],
-    "team_b": ["blastoise", "rhydon"]
-  }'
+# ML service (port 8000)
+cd ml && uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
+
+# Backend (port 3001)
+cd backend && npm run start:dev
+
+# Frontend (port 3000)
+cd frontend && npm run dev
 ```
 
-**Step 2** — Record Result (if battle has already been played):
-```bash
-curl -X POST http://localhost:3001/api/engine3/result \
-  -H "Content-Type: application/json" \
-  -d '{
-    "match_id": "your-unique-match-id",
-    "actual_winner": "TrainerA",
-    "replay_link": "https://replay.pokemonshowdown.com/gen9ou-123456789",
-    "final_score": "6-3"
-  }'
-```
-
-**Bulk import script** (Node.js, run from project root):
-```js
-// scripts/import-battles.js
-const fs = require('fs');
-const csv = require('csv-parse/sync');
-
-const rows = csv.parse(fs.readFileSync('battles.csv'), { columns: true });
-
-for (const row of rows) {
-  // POST predict then POST result for each row
-  // See API docs above
-}
-```
-
-### Important Rules
-1. **Predictions are immutable** — once created, the predicted winner cannot be changed
-2. **Match IDs must be unique** — duplicate match IDs will return a `409 Conflict` error
-3. The Correct field in the CSV reflects `actual_winner.toLowerCase() === predicted_winner.toLowerCase()`
+The backend auto-runs all DB migrations (`ALTER TABLE IF NOT EXISTS`) on startup — safe to restart at any time.
 
 ---
 
-## 7. Model Metrics
+## 3. User Accounts & Trainer Profiles
 
-### Navigation
-Sidebar → **Model Metrics** (#07)
+### Registration (2-step)
 
-### What It Shows
+**Step 1:** Username, password, section
 
-**Performance Metrics Panel:**
-| Metric | Game Label | Meaning |
-|--------|-----------|---------|
-| Accuracy | "SUPER EFFECTIVE!" | % of predictions correct |
-| Precision | "CRITICAL HIT!" | Of all A-wins predicted, how many were right |
-| Recall | "IT'S EFFECTIVE!" | Of all actual A-wins, how many did we catch |
-| F1 Score | "COMBO ATTACK!" | Balance of precision and recall |
-| Brier Score | "NOT VERY EFFECTIVE…" | Probability calibration quality |
-| Log Loss | "WILD MISS?" | Penalty for overconfident wrong predictions |
+**Step 2 — Trainer Customization:**
+- **Trainer Class**: Choose from 35+ trainer sprites (Youngster, Ace Trainer, Brock, Misty, Giovanni, Red, Blue, etc.)
+- **Card Color**: 8 color options for your trainer card theme
+- **My Pokémon**: Search any Gen 1 Pokémon — choose the one you've been assigned
+- **Display Name, Hometown, Trainer Title, Trainer ID**: Cosmetic fields shown on your trainer card
 
-**Summary Stats:** Total battles evaluated, correct count, incorrect count, win rate
+All choices are saved to your account and can be changed any time at `/profile` → EDIT TRAINER.
 
-**Engine 2 Counter Success Rate:** How often Engine 2's recommendations won
+### Trainer Card
 
-**Confusion Matrix:**
-| Cell | Label | Meaning |
-|------|-------|---------|
-| TP | Super Effective! | Predicted A wins → A won ✓ |
-| FP | Not Very Effective… | Predicted A wins → B won ✗ |
-| FN | Missed! | Predicted B wins → A won ✗ |
-| TN | Dodged! | Predicted B wins → B won ✓ |
+Your trainer card appears:
+- On the Dashboard Pokédex right panel
+- At `/profile`
+- In leaderboard entries (future)
 
-**Accuracy Over Time:** Line chart showing rolling accuracy as battles accumulate (requires ≥2 evaluated battles)
+It shows: trainer sprite, Pokémon sprite, display name, ID, title badge, hometown, and battle stats (W/L/Win%).
 
-### Metric Source
-Metrics prefer the ML service's computed values (from `GET /api/engine3/accuracy`) and fall back to DB-computed values when the ML service is unavailable.
+### Data Isolation
+
+Every user's engine outputs, battle predictions, and assigned Pokémon pool are scoped by `user_id` (UUID). You only ever see your own data. The leaderboard is the only cross-user view.
+
+### JWT Authentication
+
+All engine POST endpoints require a Bearer token (`Authorization: Bearer <token>`). The token is stored in `localStorage` as `pk_auth` and automatically attached to every API request. Tokens expire after 7 days.
 
 ---
 
-## 8. Pokémon DB
+## 4. Engine 01 — The Forge
 
-### Navigation
-Sidebar → **Pokémon DB** (#02)
+**Route:** `/engine1` · **Auth:** Required · **ML:** K-Means clustering
 
-### What It Shows
-Full table of all 151 Gen 1 Pokémon with:
-- PokeAPI sprite
-- Name, Type badges
-- All 6 base stats + Total
-- Role label, Speed tier
-- Weakness count, Resistance count
-- Assignment status
+### What it does
+Generates a 4-Pokémon Gym Leader team tailored to a chosen type specialty and difficulty. Uses ML clustering to find the best-fitting Pokémon for each role slot.
 
-### Filtering
-- Search by name
-- Filter by type
-- Filter by role (sweeper / tank / wall / support / balanced)
+### How to use
+1. Select a **Type Specialty** (Fire, Water, Ghost, Dragon, Balanced, etc.)
+2. Choose a **Challenge Rank** (Easy = Boulder Badge, Medium = Thunder Badge, Hard = Volcano Badge)
+3. Select your **Region** (Kanto, Johto, Kalos, Alola)
+4. Optionally enter a **Gym Leader name**, section, and group name
+5. Click **CHOOSE THIS TEAM**
 
-### Data Source
-Populated by the ETL pipeline (`ml/pipeline/`) from the PokeAPI:
-1. **Extract** (`extract.py`) — fetch all 151 Pokémon from `https://pokeapi.co/api/v2/`
-2. **Transform** (`transform.py`) — compute scaled stats, role labels, type coverage, weakness scores
-3. **Load** (`load.py`) — insert into `pokemon_data` SQLite table
+### Output
+- 4 Pokémon with role (Sweeper, Tank, Wall, Support, Balanced)
+- Silhouette Score (clustering quality — closer to 1.0 = better)
+- AI explanation of the team composition
+- **EXPORT FOR SHOWDOWN** → copies team in PS-importable format
+- **TAKE THIS TEAM TO BATTLE** → pre-fills Engine 3 with this team
+
+### ML Models Used
+| Model | Purpose |
+|-------|---------|
+| K-Means | Cluster Pokémon by stat profile |
+| Decision Tree | Assign role labels |
+| Random Forest | Validate team composition |
+| Cosine Similarity | Find thematically similar picks |
+| Gower's Distance | Mixed-type distance for diverse stats |
+
+### Notes
+- Legendaries and Mythicals are excluded from all pools
+- Region filter restricts the pool to Pokémon native to that region
+- The generated team is saved to `engine_output` and used by Engine 07's export
 
 ---
 
-## 9. Pokémon Showdown Integration
+## 5. Engine 02 — The Counter
 
-[Pokémon Showdown](https://pokemonshowdown.com) is an online Pokémon battle simulator. The system is **designed to accept Showdown replay links** in the ground truth recording step.
+**Route:** `/engine2` · **Auth:** Required · **ML:** Type Advantage Score + K-NN + DT
 
-### Current Integration
-The `replay_link` field on `ground_truth` stores a Showdown URL, e.g.:
+### What it does
+Given an opponent's Gym Leader team, recommends the best counter team from your assigned Pokémon pool.
+
+### How to use
+1. Enter up to 4 of the **opponent's Pokémon** (use the autocomplete search)
+2. Optionally: click **IMPORT FROM SHOWDOWN** to paste a PS team text directly
+3. Select your **region** if applicable
+4. Click **COUNTER**
+
+### Pool Priority
+1. If you have personally assigned Pokémon (`/pokemon/my-pool` with `user_assigned: true`) → uses those
+2. If no personal pool → falls back to globally assigned Pokémon (`is_assigned = 1`)
+
+### Output
+- 6 recommended counter Pokémon with counter scores and score breakdowns
+- Type matchup table showing advantage/disadvantage against each opponent Pokémon
+- Counter Success Rate metric
+
+### Also: `counter-from-data` endpoint
+A stateless version (`POST /api/engine2/counter-from-data`) accepts raw Pokémon stat objects without DB lookups — useful for external integrations.
+
+### Metric: Counter Success Rate
+Tracked in `engine_output`. When a counter team is used and the battle result is recorded in Engine 03, the system calculates whether the counter recommendation was successful.
+
+---
+
+## 6. Engine 03 — The Oracle
+
+**Route:** `/engine3` · **Auth:** Required · **ML:** 5-model ensemble
+
+### What it does
+Predicts the winner of a Pokémon battle BEFORE it happens. After the battle, records the actual result and updates the model's accuracy metrics.
+
+### IMPORTANT: Order of operations
 ```
-https://replay.pokemonshowdown.com/gen9ou-1234567890
+1. BOTH trainers agree on team compositions
+2. ONE trainer opens Engine 3 and submits the prediction
+   (prediction is LOCKED immediately — cannot be edited)
+3. Battle is played on Pokémon Showdown
+4. EITHER trainer records the actual result in Engine 3
+5. System computes correct_prediction and updates metrics
 ```
-This link appears as a **"View →"** button in the Battle History table.
 
-### Replay URL Format
+### How to use
+**Before battle:**
+1. Enter a unique **Match ID** (e.g. `match_jardo_vs_tone_01`)
+2. Enter **Trainer A name** and their 4 Pokémon
+3. Enter **Trainer B name** and their 4 Pokémon
+4. Click **PREDICT** → prediction is locked
+
+**After battle:**
+1. Find the match in the history section or re-enter the Match ID
+2. Select the **actual winner**
+3. Optionally add: replay link, screenshot link, final score
+4. Click **RECORD RESULT**
+
+### Output
+- Predicted winner with confidence score (%)
+- Per-model votes (5 models)
+- Prediction reason
+- After result: CORRECT ★ or WRONG ✗ badge
+
+### ML Models
+| Model | Role |
+|-------|------|
+| Decision Tree | Rule-based splits on stat ratios |
+| Random Forest | Ensemble of stat-based trees |
+| Logistic Regression | Linear boundary on feature space |
+| Naïve Bayes | Probabilistic type/role matching |
+| K-Nearest Neighbors | Similarity to past battles |
+
+Final prediction = majority vote across all 5 models.
+
+### Metrics tracked
+Accuracy · Precision · Recall · F1 · Brier Score · Log Loss · Confusion Matrix (TP/FP/TN/FN)
+
+---
+
+## 7. Engine 04 — The Archive
+
+**Route:** `/archive` (also on Dashboard) · **Auth:** None (public)
+
+### What it does
+Live leaderboard ranking all trainers by battle performance, plus global system statistics.
+
+### Leaderboard columns
+| Column | Definition |
+|--------|-----------|
+| Rank | Sorted by win rate DESC, then total wins DESC |
+| Trainer | Battler name from the prediction |
+| W / L | Wins and losses from recorded ground truths |
+| Win% | wins / (battles with results) × 100 |
+| Avg Confidence | Mean confidence score across all battles |
+
+### Global Stats panel
+- Total battles recorded
+- Most-used Pokémon (appears most across all team compositions)
+- Most accurate model
+- Overall system accuracy
+
+### Dashboard integration
+The leaderboard is embedded directly in the Pokédex card on the dashboard. It auto-loads when the page opens.
+
+---
+
+## 8. Engine 05 — The Commentator
+
+**Route:** `/engine5` · **Auth:** Required · **AI:** Anthropic Claude claude-sonnet-4-6
+
+### What it does
+Generates dramatic post-battle AI commentary in the style of the Pokémon anime for any completed battle.
+
+### How to use
+1. The page lists your recent completed battles (battles with a recorded result)
+2. Select a battle
+3. Click **GENERATE COMMENTARY**
+4. Wait ~3-5 seconds for Claude to generate 3 paragraphs of commentary
+
+### What Claude receives
+- Team A trainer name + Pokémon team
+- Team B trainer name + Pokémon team
+- Predicted winner + confidence %
+- Actual winner
+- Whether the prediction was correct
+
+### Output
+3-paragraph narrative commentary mentioning specific Pokémon names, type advantages, and why the winner succeeded. If the prediction was wrong, Claude acknowledges the upset dramatically.
+
+### Requires
+`ANTHROPIC_API_KEY` set in `backend/.env`
+
+---
+
+## 9. Engine 06 — The Pokedex AI
+
+**Route:** `/engine6` · **Auth:** None · **AI:** Anthropic Claude + keyword RAG
+
+### What it does
+A chat interface with Professor Oak that answers questions about Gen 1 Pokémon using structured data from the database.
+
+### How to use
+1. Type a question in the input box or click a suggestion
+2. Press Enter or click SEND
+3. Professor Oak responds using Pokémon data as context
+
+### Example questions
+- "Who is the best sweeper?"
+- "Which Pokémon counters Psychic types?"
+- "Build me a balanced team"
+- "What are the fastest Pokémon?"
+- "Compare Gengar and Alakazam"
+
+### How it works (RAG approach)
+1. User submits a question
+2. System loads all 151 Pokémon rows from the DB
+3. Keyword filtering selects the 10 most relevant Pokémon based on name/type/role matches in the question
+4. Top 10 Pokémon stats are formatted as structured context
+5. Sent to Claude with a Professor Oak persona prompt
+6. Response includes the sources (Pokémon used as context)
+
+### Requires
+`ANTHROPIC_API_KEY` set in `backend/.env`
+
+---
+
+## 10. Engine 07 — The Exporter
+
+**Route:** `/engine7` · **Auth:** Required
+
+### What it does
+A standalone import/export utility for Pokémon Showdown team formats.
+
+### Import panel
+1. Paste any Pokémon Showdown team text (copy from PS teambuilder → Import/Export)
+2. Click **IMPORT TEAM**
+3. System parses the PS format and matches Pokémon names to the database
+4. Shows **Found** (green pills) and **Not Found** (red pills)
+5. Click **USE THIS TEAM** to send the found Pokémon to Engine 02
+
+### Export panel
+1. Select up to 4 Pokémon from your pool using the chip selector
+2. Click **COPY TO CLIPBOARD**
+3. Paste into PS teambuilder → Import/Export
+
+### PS Format
+The system generates proper Gen 1 PS-importable format:
 ```
-https://replay.pokemonshowdown.com/{format}-{battle-id}
-```
-Common formats: `gen9ou`, `gen9randombattle`, `gen9vgc2024`, `gen1ou`
-
-### How to Use It
-1. Play your battle on Pokémon Showdown
-2. At the end, click **"Upload and share replay"**
-3. Copy the replay URL (e.g. `https://replay.pokemonshowdown.com/gen9ou-123456`)
-4. Paste it into the **Replay Link** field when recording your battle result
-
-### Planned Extensions
-The system is ready for deeper integration:
-
-| Feature | How It Would Work |
-|---------|------------------|
-| Auto-parse winner | Fetch `https://replay.pokemonshowdown.com/{id}.json` → extract `p1rating` / `p2rating` and last line of the log |
-| Auto-import team | Parse the Showdown team export format (6 lines per Pokémon) to auto-fill team_a / team_b |
-| Auto-record result | Webhook or polling — detect when a replays link is posted, parse outcome, auto-fill ground truth |
-
-### Showdown Team Format (for reference)
-```
-Pikachu @ Light Ball
-Ability: Static
-Level: 50
-EVs: 252 SpA / 4 SpD / 252 Spe
-Timid Nature
+Gengar
+- Body Slam
+- Earthquake
+- Ice Beam
 - Thunderbolt
-- Volt Switch
-- Hidden Power Ice
-- Nasty Plot
+
+Starmie
+- Rest
+- Toxic
+- Thunder Wave
+- Body Slam
 ```
-The system currently stores teams as a list of Pokémon names. Full moveset/ability data is a planned extension.
+Moves are assigned by role (sweeper/tank/wall/support/balanced).
 
 ---
 
-## 10. Backend Logic Notes
+## 11. Engine 08 — The Wall
 
-### API Endpoints Reference
+**Route:** `/wall` · **Auth:** None (public display)
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/pokemon` | All 151 Pokémon |
-| GET | `/api/pokemon/assigned` | Assigned pool only |
-| POST | `/api/engine1/generate` | Generate gym team |
-| POST | `/api/engine2/counter` | Get counter picks |
-| GET | `/api/engine2/success-rate` | Counter success rate |
-| POST | `/api/engine3/predict` | Predict battle winner |
-| POST | `/api/engine3/result` | Record actual result |
-| GET | `/api/engine3/history` | All predictions + results |
-| GET | `/api/engine3/accuracy` | Model metrics |
-| GET | `/api/audit` | Audit log entries |
+### What it does
+A fullscreen live leaderboard designed for classroom/projector display. No navigation bar, no login required.
 
-### Prediction Lock Mechanism
-Once a prediction is created via `POST /api/engine3/predict`, it is **immediately locked** (`is_locked = 1`). This prevents post-hoc manipulation of predictions to inflate accuracy scores.
+### Features
+- Polls `GET /api/archive/leaderboard` every **10 seconds**
+- Large-format trainer names and W/L/Win% display
+- Rank badge colors: Gold (#1), Silver (#2), Bronze (#3)
+- Win rate color-coding: Gold = 100%, Green = ≥50%, Red = <50%
+- "LIVE" pulsing indicator
 
-The lock is enforced at the database level via the `is_locked` column. Any attempt to re-predict with the same `match_id` returns `409 Conflict`.
+### To use
+Open `http://localhost:3000/wall` on a projector browser. The page auto-refreshes with new results. No interaction needed.
 
-### Audit Trail
-Every INSERT, PREDICT, LOCK, and BATTLE_END is written to `audit_log`. This creates a tamper-evident chain for data integrity.
+---
 
-### Auto-Retrain
-When a ground truth result is recorded (`POST /api/engine3/result`):
-1. The new battle's feature vector is computed
-2. Appended to `ml/data/processed/synthetic_battles.csv`
-3. All 5 Engine 3 models are retrained immediately
-4. Models are saved to `ml/models/*.pkl`
-5. In-process cache is refreshed
+## 12. Engine 09 — The Scanner
 
-This is non-fatal — if retrain fails, the ground truth is still saved.
+**Route:** `/engine9` · **Auth:** Required
 
-### Known Bug: Metrics Function
-In `ml/engines/engine3_battle_predictor.py`, the `get_metrics()` function reads the CSV with:
+### What it does
+Analyses a team of up to 4 Pokémon and produces a type weakness profile with an SVG radar chart across all 18 types.
+
+### How to use
+1. Type Pokémon names in the 6 input fields (autocomplete supported)
+2. Click **SCAN TEAM**
+
+### Output
+- **SVG Radar Chart**: 18-axis chart where each axis = one type
+  - Red spike = weakness (avg multiplier ≥ 1.5×)
+  - Green = resistance (avg multiplier ≤ 0.5×)
+  - Gray = neutral
+- **Coverage Audit panel**:
+  - Types your team is weak to
+  - Types your team resists
+  - Uncovered offensive types
+  - Recommended types to add for better coverage
+
+### How it calculates
+For each type, the system averages the `def_vs_{type}` multiplier across all 4 Pokémon. Values above 1.5 = critical weakness, below 0.75 = strong resistance.
+
+---
+
+## 13. Engine 10 — The Replay
+
+**Route:** `/engine10` · **Auth:** Required
+
+### What it does
+Parses a Pokémon Showdown battle replay into a structured turn-by-turn timeline viewer.
+
+### How to use
+1. After a battle on Pokémon Showdown, copy the replay URL or ID (e.g. `gen1ou-12345` or the full URL)
+2. Paste it into the input field on Engine 10
+3. Click **LOAD REPLAY**
+
+### Output
+Turn-by-turn event log grouped by turn number:
+- **MOVE** events: which Pokémon used which move
+- **DAMAGE** events: HP changes
+- **SWITCH** events: Pokémon switches
+- **HEAL** events: recovery
+- **FAINT** events: knockouts
+- **WIN** highlight: winner announcement
+
+### Replay Sync
+Separately, you can sync the latest Gen 1 OU replays from PS automatically:
+```
+POST /api/replay/sync
+GET  /api/replay/recent
+```
+Synced replays are stored in the `showdown_replay` table.
+
+---
+
+## 14. Pokémon Showdown Integration
+
+The system integrates with Pokémon Showdown at multiple points:
+
+### Team Export (Engine 01 + 07)
+- Engine 01 results: "EXPORT FOR SHOWDOWN" copies PS-format team text to clipboard
+- "Open in Showdown ↗": copies team + opens PS teambuilder in new tab
+- In PS: click **Import/Export → paste** to load the team
+
+### Team Import (Engine 02 + 07)
+- Engine 02: "IMPORT FROM SHOWDOWN" button opens a paste modal
+- Engine 07: Dedicated import panel
+
+### PS Format Supported
+```
+Pikachu
+- Move 1
+- Move 2
+- Move 3
+- Move 4
+
+Starmie
+- Move 1
+...
+```
+Handles: `Name @ Item`, `Name (Nickname)`, move lines (`- Move`), blank lines, `=== headers ===`
+
+### Why PS cannot be embedded
+PS sets `X-Frame-Options: SAMEORIGIN` — iframing from another domain is blocked by the browser. The clipboard + paste approach is the correct workflow.
+
+---
+
+## 15. Dashboard
+
+**Route:** `/` · **Auth:** Optional (data is scoped to logged-in user)
+
+### Pokédex Card (left)
+- **BATTLE LEADERBOARD**: Live top-8 trainer rankings from Engine 04
+- Right panel: Trainer name/ID/title, last generated team grid (6 sprites), LAUNCH BATTLE button, COPY TEAM button, trainer rank stars
+
+### Battle Station (right)
+- 3D Pokéball
+- Quick navigation: Gym Team Builder, Counter Pick, Battle Predict
+
+### Trainer Status cards
+| Card | Source | Logged out |
+|------|--------|-----------|
+| TOTAL POKÉMON | All Pokémon in DB | Shows (411) |
+| ASSIGNED POOL | User's `user_assigned` count | Shows `—` |
+| TOTAL BATTLES | User's recorded battles | Shows `—` |
+| ACCURACY | User's prediction accuracy | Shows `—` |
+
+### Recent Battle Log
+Last 5 of the logged-in user's battle predictions. Shows PENDING → CORRECT/WRONG after result is recorded.
+
+---
+
+## 16. Battle History & Model Metrics
+
+### `/history`
+Full paginated list of all the user's battle predictions with results, confidence scores, and timestamps.
+
+Status badges:
+- **PENDING**: Prediction made, no result recorded yet
+- **★ CORRECT**: Predicted winner matched actual winner
+- **✗ WRONG**: Prediction was incorrect
+
+### `/metrics`
+Model performance dashboard showing:
+- Per-model accuracy comparison
+- Confusion matrix (TP/FP/TN/FN)
+- Accuracy, Precision, Recall, F1, Brier Score, Log Loss
+- Total battles and correct predictions
+
+---
+
+## 17. Pokémon DB & Pool Management
+
+### `/pokemon`
+Browse all 151 Gen 1 Pokémon with stats, types, roles, and assigned status. Filter by type, role, or region.
+
+### Personal Pool (`/pokemon/my-pool`)
+Each user has a personal Pokémon pool stored in `user_pokemon_assignment`. To assign Pokémon:
+1. Go to `/pokemon`
+2. Toggle the POOL column for any Pokémon
+3. Assigned Pokémon appear with a yellow star
+
+Your personal pool is used by **Engine 02** as the counter team source. If empty, Engine 02 falls back to the global assigned pool.
+
+### Assigned Pokémon CSV
+When your assigned Pokémon CSV is provided:
+```bash
+# Place CSV at:
+ml/data/csv/assigned_pokemon.csv
+
+# Re-run pipeline to seed global is_assigned flags:
+cd ml && python pipeline/run_pipeline.py --limit 151
+```
+
+---
+
+## 18. Database Schema Reference
+
+### `users`
+```sql
+id               UUID PRIMARY KEY DEFAULT gen_random_uuid()
+username         TEXT UNIQUE NOT NULL
+password_hash    TEXT NOT NULL
+display_name     TEXT
+section          TEXT DEFAULT '3ISC'
+trainer_class    TEXT DEFAULT 'youngster'
+trainer_card_color TEXT DEFAULT 'red'
+starter_pokemon  TEXT DEFAULT 'charmander'
+hometown         TEXT DEFAULT 'Pallet Town'
+favorite_type    TEXT DEFAULT 'Normal'
+trainer_title    TEXT DEFAULT 'Trainer'
+rival_name       TEXT DEFAULT ''
+trainer_id       TEXT DEFAULT ''
+created_at       TIMESTAMPTZ DEFAULT NOW()
+```
+
+### `pokemon_data`
+151 rows. Key columns: `pokemon_id, pokeapi_id, name, type_1, type_2, hp, attack, defense, special_attack, special_defense, speed, total_base_stats, role_label, speed_tier, weakness_count, resistance_count, def_vs_[18 types], native_region, generation, restricted_status, is_assigned`
+
+### `user_pokemon_assignment`
+```sql
+user_id    UUID FK → users.id ON DELETE CASCADE
+pokemon_id INT FK → pokemon_data.pokemon_id
+assigned_at TIMESTAMPTZ DEFAULT NOW()
+PRIMARY KEY (user_id, pokemon_id)
+```
+
+### `engine_output`
+Logs every Engine 1/2 run: `engine_type, model_used, input_data, generated_output, region, type_specialization, gym_leader, section, group_name, user_id, timestamp`
+
+### `prediction`
+Locked pre-battle records: `match_id, battler_a, battler_b, predicted_winner, confidence_score, prediction_reason, model_used, team_a (JSON), team_b (JSON), is_locked, user_id, timestamp`
+
+### `ground_truth`
+Post-battle actuals: `match_id, actual_winner, correct_prediction (0/1), replay_link, screenshot_link, final_score, num_turns, mvp_pokemon, timestamp`
+
+### `audit_log`
+Every write operation: `user_or_group, action_done, affected_table, affected_record, old_value, new_value, user_id, timestamp`
+
+### `showdown_replay`
+Synced PS replays: `replay_id TEXT PK, format, p1, p2, winner, upload_time, synced_at`
+
+---
+
+## 19. Known Issues & Notes
+
+### ML metric fix (Engine 3)
+The `get_metrics()` function in `ml/engines/engine3_battle_predictor.py` compares the CSV `winner` column as string `"A"` but the data stores integers `0/1`. If accuracy shows 0%, apply this fix:
 ```python
-y = (df["winner"] == "A").astype(int).values
-```
-But the CSV stores winner as integers `0` (A wins) / `1` (B wins), not strings. This makes the comparison always `False` on integer data. The `train()` function handles this correctly with a dtype check — `get_metrics()` needs the same fix:
-```python
-# Fix needed in get_metrics():
-raw_winner = df["winner"]
-if raw_winner.dtype == object or raw_winner.dtype.kind in ("U", "S"):
-    y = (raw_winner.str.upper() == "A").astype(int).values
-else:
-    y = (raw_winner.astype(int) == 0).astype(int).values
+# In get_metrics(), change:
+df['correct'] = df['winner'] == 'A'
+# To:
+df['correct'] = df['winner'].astype(str) == df['predicted'].astype(str)
 ```
 
----
+### Supabase free tier
+The Supabase free tier pauses projects after ~1 week of inactivity. If the backend shows `ENOTFOUND`, go to [supabase.com/dashboard](https://supabase.com/dashboard), find the project, and click **Restore project**.
 
-## 11. Database Schema Reference
+### Stale localStorage sessions
+JWT tokens are stored in `localStorage`. If a user's token expires, the dashboard auto-clears it on the next 401 response. Manual clear: DevTools → Application → Local Storage → delete `pk_auth`.
 
-### Tables
-
-| Table | Primary Key | Description |
-|-------|-------------|-------------|
-| `pokemon_data` | `pokemon_id` | All Pokémon with stats, types, roles |
-| `engine_output` | `engine_id` | Saved outputs from all 3 engines |
-| `prediction` | `match_id` | Pre-battle predictions (locked on create) |
-| `ground_truth` | `id` | Post-battle actual results |
-| `audit_log` | `audit_id` | Immutable action log |
-
-### View: `v_prediction_accuracy`
-Joins `prediction` and `ground_truth`. Aliases:
-- `prediction.timestamp` → `predicted_at`
-- `ground_truth.timestamp` → `result_at`
-
-Use `predicted_at` / `result_at` in all frontend queries (not `.timestamp`).
-
-### is_assigned Flag
-In `pokemon_data`, `is_assigned = 1` marks Pokémon available to Engine 2.
-Default: 0 (all Pokémon unassigned until the pipeline or manual assignment sets this).
-
----
-
-## 12. Required Information Checklist
-
-### Engine 1 — Gym Leader Team Builder
-
-| Requirement | Detail |
-|------------|--------|
-| **Engine name** | Gym Leader Team Builder |
-| **Engine type** | Clustering + Classification + Scoring |
-| **Purpose** | Generate a themed, balanced 6-Pokémon Gym Leader team optimised for a given type and difficulty level |
-| **Data source** | `pokemon_data` SQLite table (loaded via NestJS → Python) — sourced from PokeAPI |
-| **Model used** | K-Means (k=5), Decision Tree (max_depth=5), Random Forest (50 estimators), Cosine Similarity, Gower Distance |
-| **Features used** | hp, attack, defense, sp_atk, sp_def, speed (all scaled to [0,1]) |
-| **Processing pipeline** | Filter by type → Filter by difficulty percentile → K-Means cluster → DT role assignment → RF usefulness score → Cosine ace selection → Gower diversity assembly |
-| **Recording method** | Results saved to `engine_output` table with `engine_type = 'gym_leader'` |
-| **Output** | 6-slot team JSON: name, type, role, BST, usefulness score, reason |
-| **Engine logic** | Clusters pool into role archetypes, assigns roles via DT, scores usefulness via RF, selects ace by cosine proximity to theme centroid, fills remaining slots maximising Gower diversity |
-| **Metrics used** | Silhouette score (cluster quality) |
-| **Graphs/tables** | 6-card team grid with type badges, stat bars, role labels, audio cry buttons |
-
-### Engine 2 — Counter-Pick Engine
-
-| Requirement | Detail |
-|------------|--------|
-| **Engine name** | Counter-Pick Engine |
-| **Engine type** | Type-effectiveness scoring + ML classification |
-| **Purpose** | Recommend the 6 best Pokémon from the assigned pool to counter a given opponent team |
-| **Data source** | `pokemon_data` (opponent lookup + assigned pool), TYPE_CHART constant |
-| **Model used** | K-NN (k=5), Decision Tree (max_depth=4), Type Coverage Score (rule-based) |
-| **Features used** | 10-dim vector: normalised stats + total BST; TCS, SAS, RS computed separately |
-| **Processing pipeline** | Lookup opponent data → Load assigned pool → Train KNN+DT on TCS threshold → Score all candidates → Weighted rank → Build matchup table |
-| **Recording method** | Results saved to `engine_output` table with `engine_type = 'counter_pick'` |
-| **Output** | Top-6 counter cards with rank, score breakdown (TCS/SAS/RS/KNN/DT), type badge, reason text |
-| **Engine logic** | Computes type-effectiveness, stat advantage, and resistance scores per candidate; trains KNN and DT on "is strong counter" binary label; final score is weighted sum |
-| **Metrics used** | Counter Success Rate (wins / total sessions) |
-| **Graphs/tables** | Ranked counter cards with score bars; full type matchup matrix (coloured by 4×/2×/1×/<1×/immune) |
-
-### Engine 3 — Battle Predictor
-
-| Requirement | Detail |
-|------------|--------|
-| **Engine name** | Battle Predictor |
-| **Engine type** | Multi-model supervised ensemble |
-| **Purpose** | Predict the winner of a 2-trainer Pokémon battle before it occurs; record actual outcome for ongoing model evaluation |
-| **Data source** | `pokemon_data` (team stats), `synthetic_battles.csv` (training), `ground_truth` (retraining) |
-| **Model used** | Decision Tree, Random Forest, Logistic Regression, Gaussian Naive Bayes, K-NN (5-model ensemble, majority vote + weighted confidence) |
-| **Features used** | 10 differential features: speed_adv, stat_adv, coverage_adv, weakness_adv, hp_adv, atk_adv, sp_atk_adv, def_adv, type_diversity_adv, role_balance_a |
-| **Processing pipeline** | Build team feature vectors → Compute 10 differential features → Run 5 models → Majority vote → Weighted confidence → Persist prediction → Lock → Trigger retrain on result |
-| **Recording method** | Predictions locked in `prediction` table; outcomes in `ground_truth` table; `v_prediction_accuracy` view joins both |
-| **Output** | Predicted winner (trainer name), confidence %, reason text, per-model vote breakdown |
-| **Engine logic** | Each model votes A or B; majority determines winner; confidence is the weighted probability of the winning side from models with predict_proba; new ground truth appended to CSV and all models retrained |
-| **Metrics used** | Accuracy, Precision, Recall, F1 Score, Brier Score, Log Loss, Confusion Matrix (TP/FP/FN/TN) |
-| **Graphs/tables** | Accuracy-over-time line chart; confusion matrix with battle terminology; per-model accuracy breakdown |
-
----
-
-*Generated by Claude Code — Pokémon Data Engine System Guide v1.0*
+### PS replay embedding
+Pokemon Showdown cannot be embedded via iframe due to `X-Frame-Options: SAMEORIGIN`. The correct workflow is copy team → open PS → Import from text or URL → paste.

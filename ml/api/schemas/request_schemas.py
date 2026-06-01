@@ -75,6 +75,9 @@ class Engine1Request(BaseModel):
     theme: str = Field(..., description="One of the 18 Pokémon types or 'balanced'")
     difficulty: str = Field("medium", description="easy | medium | hard")
     pokemon_pool: list[PokemonData] = Field(..., min_length=1)
+    previous_team: list[str] = Field(default_factory=list)
+    previous_lineups: list[list[str]] = Field(default_factory=list)
+    variation_seed: Optional[int] = None
 
     @field_validator("theme")
     @classmethod
@@ -101,6 +104,7 @@ class TeamSlot(BaseModel):
     slot: int
     role: str
     name: str
+    pokeapi_id: Optional[int] = None
     type_1: Optional[str] = None
     type_2: Optional[str] = None
     total_base_stats: int
@@ -129,7 +133,7 @@ class Engine1Response(BaseModel):
 
 class Engine2Request(BaseModel):
     opponent_team: list[str] = Field(
-        ..., min_length=1, max_length=6,
+        ..., min_length=1, max_length=4,
         description="List of opponent Pokémon names"
     )
     opponent_data: list[PokemonData] = Field(
@@ -137,7 +141,7 @@ class Engine2Request(BaseModel):
         description="Full Pokémon dicts for the opponent team"
     )
     assigned_pool: list[PokemonData] = Field(
-        ..., min_length=1,
+        ..., min_length=0,
         description="Only is_assigned=1 Pokémon from NestJS"
     )
 
@@ -146,8 +150,9 @@ class ScoreBreakdown(BaseModel):
     tcs: float = Field(..., description="Type Coverage Score")
     sas: float = Field(..., description="Stat Advantage Score (raw, -1..1)")
     rs: float = Field(..., description="Resistance Score")
-    knn: float = Field(..., description="KNN strong-counter probability")
-    dt: float = Field(..., description="Decision Tree strong-counter probability")
+    knn: float = Field(..., description="KNN strong-counter probability (1v1-sim label)")
+    dt: float = Field(..., description="Decision Tree strong-counter probability (1v1-sim label)")
+    vulnerability: float = Field(0.0, description="Fraction of opponents that dominate C (penalty term)")
 
 
 class CounterRecommendation(BaseModel):
@@ -184,8 +189,8 @@ class Engine3PredictRequest(BaseModel):
     """
     battler_a: Optional[str] = Field(None, description="Label for Team A (e.g. trainer name)")
     battler_b: Optional[str] = Field(None, description="Label for Team B")
-    team_a_data: list[PokemonData] = Field(..., min_length=1, max_length=6)
-    team_b_data: list[PokemonData] = Field(..., min_length=1, max_length=6)
+    team_a_data: list[PokemonData] = Field(..., min_length=1, max_length=4)
+    team_b_data: list[PokemonData] = Field(..., min_length=1, max_length=4)
 
 
 class Engine3PredictResponse(BaseModel):
@@ -215,8 +220,22 @@ class TrainingMetrics(BaseModel):
 class GroundTruthBattle(BaseModel):
     """
     A single real battle result used for online retraining.
-    Must include all 10 differential features plus the actual winner.
+
+    Accepts two formats:
+    - NestJS format: {winner, team_a, team_b} — Python looks up stats from DB and computes features.
+    - Direct format: all 13 differential features + winner — used for direct API calls.
+
+    winner must always be 'A' or 'B'.
     """
+    # Required in both formats
+    winner: str = Field(..., description="'A' or 'B'")
+
+    # NestJS format — Pokémon name lists for DB lookup + feature computation
+    match_id: Optional[str] = None
+    team_a: Optional[list[str]] = Field(None, description="Pokémon names for team A (triggers DB lookup)")
+    team_b: Optional[list[str]] = Field(None, description="Pokémon names for team B")
+
+    # Pre-computed features (all default 0.0; used when team_a/team_b not provided)
     speed_adv: float = 0.0
     stat_adv: float = 0.0
     coverage_adv: float = 0.0
@@ -226,8 +245,10 @@ class GroundTruthBattle(BaseModel):
     sp_atk_adv: float = 0.0
     def_adv: float = 0.0
     type_diversity_adv: float = 0.0
-    role_balance_a: float = 0.0
-    winner: str = Field(..., description="'A' or 'B'")
+    role_balance_adv: float = 0.0
+    matchup_adv: float = 0.0
+    speed_control_adv: float = 0.0
+    dmg_matchup_adv: float = 0.0
 
     @field_validator("winner")
     @classmethod

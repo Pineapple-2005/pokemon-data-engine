@@ -22,7 +22,7 @@ router = APIRouter(prefix="/engine1", tags=["Engine 1 — Gym Leader Team Genera
     response_model=Engine1Response,
     summary="Generate a Gym Leader team",
     description=(
-        "Builds a themed 6-Pokémon team using K-Means, Decision Tree, "
+        "Builds a themed 4-Pokémon team using K-Means, Decision Tree, "
         "Random Forest, cosine similarity, and Gower diversity. "
         "All Pokémon data must be supplied in the request body — "
         "this endpoint is stateless and does not connect to the database."
@@ -37,6 +37,9 @@ async def generate_gym_leader_team(request: Engine1Request) -> Engine1Response:
             theme=request.theme,
             difficulty=request.difficulty,
             pokemon_pool=pool_dicts,
+            previous_team=request.previous_team,
+            previous_lineups=request.previous_lineups,
+            variation_seed=request.variation_seed,
         )
         return Engine1Response(**result)
 

@@ -12,7 +12,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from constants import TYPES, ROLES
-from utils.type_chart import get_defensive_multiplier, get_offensive_coverage
+from utils.type_chart import get_defensive_multiplier, get_offensive_coverage, compute_type_advantage_score
 
 logger = logging.getLogger(__name__)
 
@@ -93,6 +93,66 @@ def _safe_sum(team: list[dict], key: str) -> float:
     return sum(values)
 
 
+def _team_matchup_score(attack_team: list[dict], defend_team: list[dict]) -> float:
+    """
+    For each attacker, find its best type multiplier vs any single defender.
+    Return the average across all attackers. Range ~[0, 4].
+
+    Positive matchup_adv (A minus B) means A's types are more effective
+    against B's actual Pokémon than vice versa — the key signal that counters
+    should win over their specific target.
+    """
+    scores = []
+    for atk in attack_team:
+        atk_types = tuple(
+            t.lower() for t in [atk.get("type_1"), atk.get("type_2")] if t
+        )
+        if not atk_types:
+            continue
+        best = max(
+            (
+                compute_type_advantage_score(
+                    atk_types,
+                    tuple(t.lower() for t in [d.get("type_1"), d.get("type_2")] if t),
+                )
+                for d in defend_team
+                if d.get("type_1")
+            ),
+            default=1.0,
+        )
+        scores.append(best)
+    return sum(scores) / len(scores) if scores else 1.0
+
+
+def _speed_control(team: list[dict], opp: list[dict]) -> int:
+    """Count team members faster than the opponent's average speed."""
+    opp_avg = _safe_avg(opp, "speed")
+    return sum(1 for p in team if (p.get("speed") or 0) > opp_avg)
+
+
+def _dmg_matchup(attack_team: list[dict], defend_team: list[dict]) -> float:
+    """Type-advantage score weighted by attacker's offensive stat / 150."""
+    scores = []
+    for atk in attack_team:
+        atk_types = tuple(t.lower() for t in [atk.get("type_1"), atk.get("type_2")] if t)
+        if not atk_types:
+            continue
+        best = max(
+            (
+                compute_type_advantage_score(
+                    atk_types,
+                    tuple(t.lower() for t in [d.get("type_1"), d.get("type_2")] if t),
+                )
+                for d in defend_team
+                if d.get("type_1")
+            ),
+            default=1.0,
+        )
+        off = max(atk.get("attack") or 0, atk.get("sp_atk") or atk.get("special_attack") or 0)
+        scores.append(best * (off / 150.0))
+    return sum(scores) / len(scores) if scores else 1.0
+
+
 def _compute_role_balance(team: list[dict]) -> float:
     """
     Score team role diversity on a 0–1 scale.
@@ -116,11 +176,12 @@ def _compute_role_balance(team: list[dict]) -> float:
 
 def build_team_features(team_a: list[dict], team_b: list[dict]) -> dict:
     """
-    Build 10 differential features for Engine 3 battle prediction.
+    Build 13 differential features for Engine 3 battle prediction.
 
     All features are expressed as (team_a_value - team_b_value) so that
     positive values indicate an advantage for team A.
-    Exception: role_balance_a is team A's absolute role balance score.
+    All features are differential so swapping Team A and Team B also swaps the
+    sign of each feature.
 
     Expected dict keys on each Pokémon:
         type_1, type_2, hp, attack, defense, sp_atk, sp_def, speed,
@@ -132,23 +193,27 @@ def build_team_features(team_a: list[dict], team_b: list[dict]) -> dict:
 
     Returns:
         Dict with keys:
-            speed_adv        — avg speed A - avg speed B
-            stat_adv         — avg total_base_stats A - B
-            coverage_adv     — type coverage count A - B
-            weakness_adv     — weakness_count B - A  (inverted: fewer weaknesses is better)
-            hp_adv           — avg hp A - B
-            atk_adv          — avg attack A - B
-            sp_atk_adv       — avg sp_atk A - B
-            def_adv          — avg defense A - B
+            speed_adv          — avg speed A - avg speed B
+            stat_adv           — avg total_base_stats A - B
+            coverage_adv       — type coverage count A - B
+            weakness_adv       — weakness_count B - A  (inverted: fewer weaknesses is better)
+            hp_adv             — avg hp A - B
+            atk_adv            — avg attack A - B
+            sp_atk_adv         — avg sp_atk A - B
+            def_adv            — avg defense A - B
             type_diversity_adv — unique type count A - B
-            role_balance_a   — role diversity score for team A (absolute, not differential)
+            role_balance_adv   — role diversity score A - B
+            matchup_adv        — head-to-head type matchup score A - B
+            speed_control_adv  — count of A members faster than B avg minus reverse; range ~[-4,4]
+            dmg_matchup_adv    — type-advantage weighted by offensive stat A - B
     """
     if not team_a or not team_b:
         logger.warning("build_team_features called with empty team(s)")
         return {k: 0.0 for k in [
             "speed_adv", "stat_adv", "coverage_adv", "weakness_adv",
             "hp_adv", "atk_adv", "sp_atk_adv", "def_adv",
-            "type_diversity_adv", "role_balance_a"
+            "type_diversity_adv", "role_balance_adv", "matchup_adv",
+            "speed_control_adv", "dmg_matchup_adv",
         ]}
 
     coverage_a = get_team_type_coverage(team_a)
@@ -180,5 +245,8 @@ def build_team_features(team_a: list[dict], team_b: list[dict]) -> dict:
         "sp_atk_adv":         _safe_avg(team_a, "sp_atk") - _safe_avg(team_b, "sp_atk"),
         "def_adv":            _safe_avg(team_a, "defense") - _safe_avg(team_b, "defense"),
         "type_diversity_adv": float(len(types_a) - len(types_b)),
-        "role_balance_a":     _compute_role_balance(team_a),
+        "role_balance_adv":   _compute_role_balance(team_a) - _compute_role_balance(team_b),
+        "matchup_adv":        _team_matchup_score(team_a, team_b) - _team_matchup_score(team_b, team_a),
+        "speed_control_adv":  float(_speed_control(team_a, team_b) - _speed_control(team_b, team_a)),
+        "dmg_matchup_adv":    _dmg_matchup(team_a, team_b) - _dmg_matchup(team_b, team_a),
     }

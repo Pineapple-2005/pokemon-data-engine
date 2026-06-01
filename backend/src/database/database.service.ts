@@ -54,6 +54,7 @@ export class DatabaseService implements OnModuleInit {
   // ---------------------------------------------------------------------------
 
   private async initSchema(): Promise<void> {
+    await this.createShowdownReplayTable();
     // ── Idempotent column migrations ──
     await this.runMigration(`ALTER TABLE pokemon_data ADD COLUMN IF NOT EXISTS native_region TEXT NOT NULL DEFAULT 'Kanto'`);
     await this.runMigration(`ALTER TABLE pokemon_data ADD COLUMN IF NOT EXISTS generation INTEGER NOT NULL DEFAULT 1`);
@@ -69,6 +70,16 @@ export class DatabaseService implements OnModuleInit {
     await this.runMigration(`ALTER TABLE engine_output ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES users(id) ON DELETE SET NULL`);
     await this.runMigration(`ALTER TABLE prediction ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES users(id) ON DELETE SET NULL`);
     await this.runMigration(`ALTER TABLE audit_log ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES users(id) ON DELETE SET NULL`);
+
+    // ── Trainer customization columns ──
+    await this.runMigration(`ALTER TABLE users ADD COLUMN IF NOT EXISTS trainer_class TEXT DEFAULT 'youngster'`);
+    await this.runMigration(`ALTER TABLE users ADD COLUMN IF NOT EXISTS trainer_card_color TEXT DEFAULT 'red'`);
+    await this.runMigration(`ALTER TABLE users ADD COLUMN IF NOT EXISTS starter_pokemon TEXT DEFAULT 'charmander'`);
+    await this.runMigration(`ALTER TABLE users ADD COLUMN IF NOT EXISTS hometown TEXT DEFAULT 'Pallet Town'`);
+    await this.runMigration(`ALTER TABLE users ADD COLUMN IF NOT EXISTS favorite_type TEXT DEFAULT 'Normal'`);
+    await this.runMigration(`ALTER TABLE users ADD COLUMN IF NOT EXISTS trainer_title TEXT DEFAULT 'Trainer'`);
+    await this.runMigration(`ALTER TABLE users ADD COLUMN IF NOT EXISTS rival_name TEXT DEFAULT ''`);
+    await this.runMigration(`ALTER TABLE users ADD COLUMN IF NOT EXISTS trainer_id TEXT DEFAULT ''`);
 
     await this.pool.query(`
       CREATE TABLE IF NOT EXISTS user_pokemon_assignment (
@@ -90,6 +101,21 @@ export class DatabaseService implements OnModuleInit {
       UPDATE pokemon_data SET restricted_status = 'mythical'
       WHERE pokeapi_id = 151 AND restricted_status = 'none'
     `);
+  }
+
+  async createShowdownReplayTable(): Promise<void> {
+    await this.pool.query(`
+      CREATE TABLE IF NOT EXISTS showdown_replay (
+        replay_id   TEXT    PRIMARY KEY,
+        format      TEXT    NOT NULL,
+        p1          TEXT    NOT NULL,
+        p2          TEXT    NOT NULL,
+        winner      TEXT,
+        upload_time INTEGER NOT NULL,
+        synced_at   TEXT    NOT NULL
+      )
+    `);
+    this.logger.log('Migration: showdown_replay table ensured');
   }
 
   private async runMigration(sql: string): Promise<void> {
@@ -216,20 +242,221 @@ export class DatabaseService implements OnModuleInit {
   // Users
   // ---------------------------------------------------------------------------
 
-  async findUserByUsername(username: string): Promise<{ id: string; username: string; password_hash: string; display_name?: string; section?: string } | undefined> {
+  async findUserByUsername(username: string): Promise<{
+    id: string;
+    username: string;
+    password_hash: string;
+    display_name?: string;
+    section?: string;
+    trainer_class: string;
+    trainer_card_color: string;
+    starter_pokemon: string;
+    hometown: string;
+    favorite_type: string;
+    trainer_title: string;
+    rival_name: string;
+    trainer_id: string;
+  } | undefined> {
     const result = await this.pool.query(
-      'SELECT id, username, password_hash, display_name, section FROM users WHERE username = $1',
+      `SELECT id, username, password_hash, display_name, section,
+              trainer_class, trainer_card_color, starter_pokemon, hometown,
+              favorite_type, trainer_title, rival_name, trainer_id
+       FROM users WHERE username = $1`,
       [username],
     );
-    return result.rows[0] as { id: string; username: string; password_hash: string; display_name?: string; section?: string } | undefined;
+    return result.rows[0] as {
+      id: string;
+      username: string;
+      password_hash: string;
+      display_name?: string;
+      section?: string;
+      trainer_class: string;
+      trainer_card_color: string;
+      starter_pokemon: string;
+      hometown: string;
+      favorite_type: string;
+      trainer_title: string;
+      rival_name: string;
+      trainer_id: string;
+    } | undefined;
   }
 
-  async createUser(username: string, passwordHash: string, displayName?: string, section?: string): Promise<{ id: string; username: string }> {
+  async findUserById(id: string): Promise<{
+    id: string;
+    username: string;
+    display_name: string;
+    section?: string;
+    trainer_class: string;
+    trainer_card_color: string;
+    starter_pokemon: string;
+    hometown: string;
+    favorite_type: string;
+    trainer_title: string;
+    rival_name: string;
+    trainer_id: string;
+  } | undefined> {
     const result = await this.pool.query(
-      'INSERT INTO users (username, password_hash, display_name, section) VALUES ($1, $2, $3, $4) RETURNING id, username',
-      [username, passwordHash, displayName ?? username, section ?? '3ISC'],
+      `SELECT id, username, display_name, section,
+              trainer_class, trainer_card_color, starter_pokemon, hometown,
+              favorite_type, trainer_title, rival_name, trainer_id
+       FROM users WHERE id = $1`,
+      [id],
     );
-    return result.rows[0] as { id: string; username: string };
+    return result.rows[0] as {
+      id: string;
+      username: string;
+      display_name: string;
+      section?: string;
+      trainer_class: string;
+      trainer_card_color: string;
+      starter_pokemon: string;
+      hometown: string;
+      favorite_type: string;
+      trainer_title: string;
+      rival_name: string;
+      trainer_id: string;
+    } | undefined;
+  }
+
+  async createUser(
+    username: string,
+    passwordHash: string,
+    displayName?: string,
+    section?: string,
+    trainerFields?: {
+      trainer_class?: string;
+      trainer_card_color?: string;
+      starter_pokemon?: string;
+      hometown?: string;
+      favorite_type?: string;
+      trainer_title?: string;
+      rival_name?: string;
+      trainer_id?: string;
+    },
+  ): Promise<{
+    id: string;
+    username: string;
+    display_name: string;
+    trainer_class: string;
+    trainer_card_color: string;
+    starter_pokemon: string;
+    hometown: string;
+    favorite_type: string;
+    trainer_title: string;
+    rival_name: string;
+    trainer_id: string;
+  }> {
+    const result = await this.pool.query(
+      `INSERT INTO users (
+         username, password_hash, display_name, section,
+         trainer_class, trainer_card_color, starter_pokemon, hometown,
+         favorite_type, trainer_title, rival_name, trainer_id
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+       RETURNING id, username, display_name,
+                 trainer_class, trainer_card_color, starter_pokemon, hometown,
+                 favorite_type, trainer_title, rival_name, trainer_id`,
+      [
+        username,
+        passwordHash,
+        displayName ?? username,
+        section ?? '3ISC',
+        trainerFields?.trainer_class    ?? 'youngster',
+        trainerFields?.trainer_card_color ?? 'red',
+        trainerFields?.starter_pokemon  ?? 'charmander',
+        trainerFields?.hometown         ?? 'Pallet Town',
+        trainerFields?.favorite_type    ?? 'Normal',
+        trainerFields?.trainer_title    ?? 'Trainer',
+        trainerFields?.rival_name       ?? '',
+        trainerFields?.trainer_id       ?? '',
+      ],
+    );
+    return result.rows[0] as {
+      id: string;
+      username: string;
+      display_name: string;
+      trainer_class: string;
+      trainer_card_color: string;
+      starter_pokemon: string;
+      hometown: string;
+      favorite_type: string;
+      trainer_title: string;
+      rival_name: string;
+      trainer_id: string;
+    };
+  }
+
+  async updateTrainerProfile(
+    userId: string,
+    fields: {
+      display_name?: string;
+      trainer_class?: string;
+      trainer_card_color?: string;
+      starter_pokemon?: string;
+      hometown?: string;
+      favorite_type?: string;
+      trainer_title?: string;
+      rival_name?: string;
+      trainer_id?: string;
+    },
+  ): Promise<{
+    id: string;
+    username: string;
+    display_name: string;
+    section?: string;
+    trainer_class: string;
+    trainer_card_color: string;
+    starter_pokemon: string;
+    hometown: string;
+    favorite_type: string;
+    trainer_title: string;
+    rival_name: string;
+    trainer_id: string;
+  }> {
+    const allowed = [
+      'display_name', 'trainer_class', 'trainer_card_color', 'starter_pokemon',
+      'hometown', 'favorite_type', 'trainer_title', 'rival_name', 'trainer_id',
+    ] as const;
+
+    const setClauses: string[] = [];
+    const params: unknown[] = [];
+
+    for (const key of allowed) {
+      if (fields[key] !== undefined) {
+        params.push(fields[key]);
+        setClauses.push(`${key} = $${params.length}`);
+      }
+    }
+
+    if (setClauses.length === 0) {
+      // Nothing to update — return current row
+      const current = await this.findUserById(userId);
+      if (!current) throw new Error('User not found');
+      return current;
+    }
+
+    params.push(userId);
+    const result = await this.pool.query(
+      `UPDATE users SET ${setClauses.join(', ')}
+       WHERE id = $${params.length}
+       RETURNING id, username, display_name, section,
+                 trainer_class, trainer_card_color, starter_pokemon, hometown,
+                 favorite_type, trainer_title, rival_name, trainer_id`,
+      params,
+    );
+    return result.rows[0] as {
+      id: string;
+      username: string;
+      display_name: string;
+      section?: string;
+      trainer_class: string;
+      trainer_card_color: string;
+      starter_pokemon: string;
+      hometown: string;
+      favorite_type: string;
+      trainer_title: string;
+      rival_name: string;
+      trainer_id: string;
+    };
   }
 
   // ---------------------------------------------------------------------------
@@ -481,5 +708,73 @@ export class DatabaseService implements OnModuleInit {
     const total = row?.total !== null && row?.total !== undefined ? parseInt(row.total, 10) : 0;
     const wins  = row?.wins  !== null && row?.wins  !== undefined ? parseInt(row.wins, 10)  : 0;
     return { total, wins, rate: total > 0 ? wins / total : 0 };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Showdown replays
+  // ---------------------------------------------------------------------------
+
+  async insertReplay(replay: {
+    replay_id: string;
+    format: string;
+    p1: string;
+    p2: string;
+    winner: string | null;
+    upload_time: number;
+    synced_at: string;
+  }): Promise<void> {
+    await this.pool.query(
+      `INSERT INTO showdown_replay (replay_id, format, p1, p2, winner, upload_time, synced_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       ON CONFLICT (replay_id) DO NOTHING`,
+      [
+        replay.replay_id,
+        replay.format,
+        replay.p1,
+        replay.p2,
+        replay.winner,
+        replay.upload_time,
+        replay.synced_at,
+      ],
+    );
+  }
+
+  async replayExists(replayId: string): Promise<boolean> {
+    const result = await this.pool.query(
+      'SELECT 1 FROM showdown_replay WHERE replay_id = $1',
+      [replayId],
+    );
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  async findRecentReplays(limit: number): Promise<Array<{
+    replay_id: string;
+    format: string;
+    p1: string;
+    p2: string;
+    winner: string | null;
+    upload_time: number;
+    synced_at: string;
+  }>> {
+    const result = await this.pool.query(
+      'SELECT * FROM showdown_replay ORDER BY upload_time DESC LIMIT $1',
+      [limit],
+    );
+    return result.rows as Array<{
+      replay_id: string;
+      format: string;
+      p1: string;
+      p2: string;
+      winner: string | null;
+      upload_time: number;
+      synced_at: string;
+    }>;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Generic query — used by archive, engine9, and other ad-hoc SQL modules
+  // ---------------------------------------------------------------------------
+  async query(sql: string, params: unknown[]): Promise<{ rows: unknown[] }> {
+    return this.pool.query(sql, params);
   }
 }

@@ -3,6 +3,7 @@
 import React from 'react';
 import { TypeBadge } from '@/components/ui/TypeBadge';
 import { RoleBadge } from '@/components/ui/RoleBadge';
+import type { TournamentLoadout } from '@/types';
 
 interface PokemonCardProps {
   readonly name: string;
@@ -15,6 +16,7 @@ interface PokemonCardProps {
   readonly slot?: number;
   readonly compact?: boolean;
   readonly pokeapi_id?: number;
+  readonly loadout?: TournamentLoadout;
 }
 
 const SPRITE_BASE = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon';
@@ -42,6 +44,7 @@ export function PokemonCard({
   slot,
   compact = false,
   pokeapi_id,
+  loadout,
 }: PokemonCardProps) {
   const statPct = total_base_stats ? Math.min((total_base_stats / 720) * 100, 100) : 0;
   const spriteUrl = pokeapi_id ? `${SPRITE_BASE}/${pokeapi_id}.png` : null;
@@ -111,6 +114,20 @@ export function PokemonCard({
         <p style={{ fontSize: '0.72rem', color: 'var(--pk-text-muted)', lineHeight: 1.5, borderTop: '1px solid var(--pk-glass-border)', paddingTop: '0.5rem', margin: 0 }}>
           {reason}
         </p>
+      )}
+
+      {loadout && !compact && (
+        <div style={{ borderTop: '1px solid var(--pk-glass-border)', paddingTop: '0.55rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+          <div style={{ fontSize: '0.62rem', color: 'var(--pk-gold)', fontWeight: 700 }}>{loadout.item}</div>
+          <div style={{ fontSize: '0.6rem', color: 'var(--pk-text-muted)' }}>Ability: {loadout.ability}</div>
+          <div style={{ fontSize: '0.56rem', color: 'var(--pk-text-dim)' }}>{loadout.evs}</div>
+          <div style={{ fontSize: '0.56rem', color: 'var(--pk-text-dim)' }}>{loadout.nature} Nature</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.18rem', marginTop: '0.15rem' }}>
+            {loadout.moves.map((move) => (
+              <span key={move} style={{ fontSize: '0.58rem', color: 'var(--pk-text-muted)' }}>- {move}</span>
+            ))}
+          </div>
+        </div>
       )}
     </div>
   );

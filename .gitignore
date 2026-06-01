@@ -16,6 +16,7 @@ ml/.venv/
 backend/dist/
 frontend/.next/
 frontend/out/
+.runtime/
 *.tsbuildinfo
 
 # Database files
@@ -28,6 +29,7 @@ frontend/out/
 ml/models/*.pkl
 ml/data/raw/
 ml/data/logs/
+ml/data/processed/
 
 # Python cache
 __pycache__/

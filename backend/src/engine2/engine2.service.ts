@@ -3,9 +3,20 @@ import { DatabaseService } from '../database/database.service';
 import { MlClientService, Engine2Response } from '../ml/ml-client.service';
 import { AuditService } from '../audit/audit.service';
 import { Pokemon } from '../common/interfaces/pokemon.interface';
+import { recommendCounterTournamentLoadouts } from '../pokemon/battle-loadout';
+import { formatShowdownTeam } from '../pokemon/showdown.parser';
 
 export interface CounterTeamParams {
   opponent_team: string[];
+  section?: string;
+  group_name?: string;
+  challenger_region?: string;
+  userId?: string;
+}
+
+export interface CounterTeamFromDataParams {
+  opponent_team: Pokemon[];
+  pokemon_pool: Pokemon[];
   section?: string;
   group_name?: string;
   challenger_region?: string;
@@ -68,6 +79,18 @@ export class Engine2Service {
       if (challenger_region) poolFilter.native_region = challenger_region;
       assignedPool = await this.db.findAllPokemon(poolFilter);
     }
+
+    // Final fallback: if still empty (no is_assigned rows seeded), use all non-restricted Pokémon
+    if (assignedPool.length === 0) {
+      const fallbackFilter: Parameters<typeof this.db.findAllPokemon>[0] = { restricted_status: 'none' };
+      if (challenger_region) fallbackFilter.native_region = challenger_region;
+      assignedPool = await this.db.findAllPokemon(fallbackFilter);
+    }
+    // If region filter still yields nothing, drop the region constraint
+    if (assignedPool.length === 0) {
+      assignedPool = await this.db.findAllPokemon({ restricted_status: 'none' });
+    }
+
     this.logger.log(
       `Engine2: opponent=${opponentData.length}, assigned_pool=${assignedPool.length}` +
         (challenger_region ? ` (challenger_region: ${challenger_region})` : ''),
@@ -75,6 +98,22 @@ export class Engine2Service {
 
     // 3. Call ML service
     const result = await this.ml.getCounterTeam(opponent_team, opponentData, assignedPool);
+
+    // Enrich recommended_team with pokeapi_id for frontend sprites
+    const poolById = new Map(assignedPool.map((p) => [p.name.toLowerCase(), p.pokeapi_id]));
+    result.recommended_team.forEach((c) => {
+      c.pokeapi_id = poolById.get(c.name.toLowerCase());
+    });
+    result.recommended_team = await recommendCounterTournamentLoadouts(result.recommended_team, assignedPool);
+    result.showdown_text = formatShowdownTeam(result.recommended_team);
+
+    // Enrich opponent_team_data for VS table sprites
+    result.opponent_team_data = opponentData.map((p) => ({
+      name: p.name,
+      pokeapi_id: p.pokeapi_id,
+      type_1: p.type_1 ?? undefined,
+      type_2: p.type_2 ?? undefined,
+    }));
 
     // 4. Persist to engine_output
     const nativeRegionNote = challenger_region
@@ -105,6 +144,88 @@ export class Engine2Service {
       action_done: 'INSERT',
       affected_table: 'engine_output',
       affected_record: `engine2:${opponent_team.join(',')}`,
+      new_value: JSON.stringify({ recommended_team: result.recommended_team }),
+    });
+
+    return result;
+  }
+
+  async getCounterTeamFromData(params: CounterTeamFromDataParams): Promise<Engine2Response> {
+    const {
+      opponent_team,
+      pokemon_pool,
+      section = '3ISC',
+      group_name = '',
+      challenger_region,
+      userId,
+    } = params;
+
+    // opponent_team and pokemon_pool are already validated as non-empty by the DTO,
+    // but guard here too so the service is safe to call directly.
+    if (opponent_team.length === 0) {
+      throw new BadRequestException({
+        success: false,
+        error: 'opponent_team must not be empty.',
+      });
+    }
+    if (pokemon_pool.length === 0) {
+      throw new BadRequestException({
+        success: false,
+        error: 'pokemon_pool must not be empty.',
+      });
+    }
+
+    const opponentNames = opponent_team.map((p) => p.name);
+
+    this.logger.log(
+      `Engine2 (from-data): opponent=${opponent_team.length}, pool=${pokemon_pool.length}` +
+        (challenger_region ? ` (challenger_region: ${challenger_region})` : ''),
+    );
+
+    // Call ML service with caller-supplied data — no DB lookup required
+    const result = await this.ml.getCounterTeam(opponentNames, opponent_team, pokemon_pool);
+
+    // Enrich sprites
+    const fromDataPoolById = new Map(pokemon_pool.map((p) => [p.name.toLowerCase(), p.pokeapi_id]));
+    result.recommended_team.forEach((c) => { c.pokeapi_id = fromDataPoolById.get(c.name.toLowerCase()); });
+    result.recommended_team = await recommendCounterTournamentLoadouts(result.recommended_team, pokemon_pool);
+    result.showdown_text = formatShowdownTeam(result.recommended_team);
+    result.opponent_team_data = opponent_team.map((p) => ({
+      name: p.name,
+      pokeapi_id: p.pokeapi_id,
+      type_1: p.type_1 ?? undefined,
+      type_2: p.type_2 ?? undefined,
+    }));
+
+    // Persist to engine_output
+    const nativeRegionNote = challenger_region
+      ? `Challenger pool filtered to ${challenger_region}`
+      : 'No region filter applied';
+
+    try {
+      await this.db.insertEngineOutput({
+        section,
+        group_name,
+        engine_type: 'counter_pick',
+        model_used: result.model_used ?? 'ml-service',
+        input_data: JSON.stringify({ opponent_team: opponentNames }),
+        generated_output: JSON.stringify(result),
+        native_region_validation: nativeRegionNote,
+        challenger_region,
+        target_gym_leader: group_name || 'opponent',
+        metric_used: 'counter_success_rate',
+        user_id: userId,
+      });
+    } catch (err) {
+      this.logger.error(`Engine2 (from-data): failed to save engine output — ${(err as Error).message}`);
+    }
+
+    // Audit log
+    this.audit.writeLog({
+      user_or_group: group_name,
+      action_done: 'INSERT',
+      affected_table: 'engine_output',
+      affected_record: `engine2:${opponentNames.join(',')}`,
       new_value: JSON.stringify({ recommended_team: result.recommended_team }),
     });
 

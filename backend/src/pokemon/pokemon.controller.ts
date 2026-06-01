@@ -11,10 +11,16 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { IsInt, Min } from 'class-validator';
+import { IsInt, IsNotEmpty, IsString, Min } from 'class-validator';
 import { PokemonService, PokemonFilterParams } from './pokemon.service';
 import { Pokemon } from '../common/interfaces/pokemon.interface';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+
+class ImportTeamDto {
+  @IsString()
+  @IsNotEmpty()
+  showdown_text: string;
+}
 
 class AssignPokemonDto {
   @IsInt()
@@ -118,6 +124,21 @@ export class PokemonController {
   ): Promise<{ success: true }> {
     await this.pokemonService.unassignFromUser(req.user.userId, dto.pokemon_id);
     return { success: true };
+  }
+
+  /**
+   * POST /api/pokemon/import-team
+   * Parses a Pokémon Showdown export string and returns which Pokémon were
+   * found in the database and which were not recognised.
+   */
+  @UseGuards(JwtAuthGuard)
+  @Post('import-team')
+  @HttpCode(HttpStatus.OK)
+  async importTeam(
+    @Body() dto: ImportTeamDto,
+  ): Promise<{ success: true; data: { found: Pokemon[]; not_found: string[] } }> {
+    const data = await this.pokemonService.importTeam(dto.showdown_text);
+    return { success: true, data };
   }
 
   /**

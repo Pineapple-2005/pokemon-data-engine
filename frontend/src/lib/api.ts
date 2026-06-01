@@ -7,10 +7,17 @@ import type {
   PredictionWithResult,
   AuditEntry,
   CounterMetrics,
+  LeaderboardEntry,
+  ArchiveStats,
+  CommentaryResponse,
+  ChatResponse,
+  ScanResult,
+  ReplayEvent,
+  TrainerProfile,
 } from '@/types';
 import { getAuthHeader } from './auth';
 
-const BASE = '/api';
+const BASE = process.env.NEXT_PUBLIC_API_URL || '/api';
 
 /** All NestJS responses are wrapped in { success: true, data: T }. */
 interface ApiEnvelope<T> { success: boolean; data: T }
@@ -24,12 +31,23 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     headers: {
       'Content-Type': 'application/json',
       ...getAuthHeader(),
-      ...(options?.headers ?? {}),
+      ...options?.headers,
     },
     ...options,
   });
   if (!res.ok) {
     const text = await res.text().catch(() => res.statusText);
+    try {
+      const payload = JSON.parse(text) as { error?: unknown; message?: unknown };
+      const message = payload.error ?? payload.message;
+      if (typeof message === 'string') throw new Error(message);
+      if (Array.isArray(message)) throw new Error(message.join(', '));
+    } catch (err) {
+      if (err instanceof SyntaxError) {
+        throw new Error(text || `HTTP ${res.status}`);
+      }
+      throw err;
+    }
     throw new Error(text || `HTTP ${res.status}`);
   }
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
@@ -51,7 +69,8 @@ export const api = {
     if (filters?.type) params.set('type', filters.type);
     if (filters?.is_assigned !== undefined) params.set('is_assigned', String(filters.is_assigned));
     const qs = params.toString();
-    return request<Pokemon[]>(`/pokemon${qs ? `?${qs}` : ''}`);
+    const path = qs ? `/pokemon?${qs}` : '/pokemon';
+    return request<Pokemon[]>(path);
   },
 
   getAssignedPokemon(): Promise<Pokemon[]> {
@@ -83,6 +102,10 @@ export const api = {
   // ---------------------------------------------------------------------------
   // Engine 1
   // ---------------------------------------------------------------------------
+  getShowdownExport(): Promise<{ text: string; team_names: string[]; ps_link: string }> {
+    return request<{ text: string; team_names: string[]; ps_link: string }>('/engine1/showdown-export-json');
+  },
+
   generateGymLeaderTeam(
     theme: string,
     difficulty: 'easy' | 'medium' | 'hard',
@@ -90,10 +113,30 @@ export const api = {
     gymLeaderName?: string,
     section?: string,
     groupName?: string,
+    previousTeam?: string[],
+    previousLineups?: string[][],
+    variationSeed?: number,
   ): Promise<Engine1Response> {
     return request<Engine1Response>('/engine1/generate', {
       method: 'POST',
-      body: JSON.stringify({ theme, difficulty, region, gym_leader_name: gymLeaderName, section, group_name: groupName }),
+      body: JSON.stringify({
+        theme,
+        difficulty,
+        region,
+        gym_leader_name: gymLeaderName,
+        section,
+        group_name: groupName,
+        previous_team: previousTeam,
+        previous_lineups: previousLineups,
+        variation_seed: variationSeed,
+      }),
+    });
+  },
+
+  importTeam(showdown_text: string): Promise<{ found: Pokemon[]; not_found: string[] }> {
+    return request<{ found: Pokemon[]; not_found: string[] }>('/pokemon/import-team', {
+      method: 'POST',
+      body: JSON.stringify({ showdown_text }),
     });
   },
 
@@ -180,20 +223,86 @@ export const api = {
     username: string,
     password: string,
     section?: string,
-  ): Promise<{ access_token: string; username: string; id: string }> {
+    trainerFields?: {
+      display_name?: string; trainer_class?: string; trainer_card_color?: string;
+      starter_pokemon?: string; hometown?: string; favorite_type?: string;
+      trainer_title?: string; rival_name?: string; trainer_id?: string;
+    },
+  ): Promise<TrainerProfile & { access_token: string }> {
     return request('/auth/register', {
       method: 'POST',
-      body: JSON.stringify({ username, password, section }),
+      body: JSON.stringify({ username, password, section, ...trainerFields }),
     });
   },
 
   login(
     username: string,
     password: string,
-  ): Promise<{ access_token: string; username: string; id: string }> {
+  ): Promise<TrainerProfile & { access_token: string }> {
     return request('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ username, password }),
     });
+  },
+
+  getMyProfile(): Promise<TrainerProfile> {
+    return request<TrainerProfile>('/auth/profile');
+  },
+
+  updateProfile(data: Partial<TrainerProfile>): Promise<TrainerProfile> {
+    return request<TrainerProfile>('/auth/profile', {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
+
+  getPublicProfile(username: string): Promise<TrainerProfile> {
+    return request<TrainerProfile>(`/auth/profile/${encodeURIComponent(username)}`);
+  },
+
+  // ---------------------------------------------------------------------------
+  // Engine 4 — Archive
+  // ---------------------------------------------------------------------------
+  getLeaderboard(): Promise<LeaderboardEntry[]> {
+    return request<LeaderboardEntry[]>('/archive/leaderboard');
+  },
+
+  getArchiveStats(): Promise<ArchiveStats> {
+    return request<ArchiveStats>('/archive/stats');
+  },
+
+  // ---------------------------------------------------------------------------
+  // Engine 5 — Commentator
+  // ---------------------------------------------------------------------------
+  generateCommentary(match_id: string): Promise<CommentaryResponse> {
+    return request<CommentaryResponse>('/engine5/comment', {
+      method: 'POST',
+      body: JSON.stringify({ match_id }),
+    });
+  },
+
+  // ---------------------------------------------------------------------------
+  // Engine 6 — Pokedex AI
+  // ---------------------------------------------------------------------------
+  chatWithOak(question: string): Promise<ChatResponse> {
+    return request<ChatResponse>('/engine6/chat', {
+      method: 'POST',
+      body: JSON.stringify({ question }),
+    });
+  },
+
+  // ---------------------------------------------------------------------------
+  // Engine 9 — Scanner
+  // ---------------------------------------------------------------------------
+  scanTeam(names: string[]): Promise<ScanResult> {
+    const q = names.filter(Boolean).join(',');
+    return request<ScanResult>(`/engine9/scan?names=${encodeURIComponent(q)}`);
+  },
+
+  // ---------------------------------------------------------------------------
+  // Engine 10 — Replay timeline
+  // ---------------------------------------------------------------------------
+  getReplayTimeline(id: string): Promise<ReplayEvent[]> {
+    return request<ReplayEvent[]>(`/replay/${encodeURIComponent(id)}/timeline`);
   },
 };

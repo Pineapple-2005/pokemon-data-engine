@@ -3,6 +3,8 @@ import { DatabaseService } from '../database/database.service';
 import { MlClientService, Engine1Response } from '../ml/ml-client.service';
 import { AuditService } from '../audit/audit.service';
 import type { EngineOutput } from '../common/interfaces/pokemon.interface';
+import { formatShowdownTeam } from '../pokemon/showdown.parser';
+import { recommendTournamentLoadouts } from '../pokemon/battle-loadout';
 
 export interface GenerateTeamParams {
   theme: string;
@@ -12,6 +14,9 @@ export interface GenerateTeamParams {
   region?: string;
   gym_leader_name?: string;
   userId?: string;
+  previous_team?: string[];
+  previous_lineups?: string[][];
+  variation_seed?: number;
 }
 
 @Injectable()
@@ -33,6 +38,9 @@ export class Engine1Service {
       region,
       gym_leader_name,
       userId,
+      previous_team = [],
+      previous_lineups = [],
+      variation_seed,
     } = params;
 
     // 1. Load non-restricted Pokémon pool (excludes legendaries and mythicals).
@@ -50,7 +58,17 @@ export class Engine1Service {
     );
 
     // 2. Call ML service — pass region through so the Python service can use it
-    const result = await this.ml.generateGymLeaderTeam(theme, difficulty, pokemonPool, region);
+    const result = await this.ml.generateGymLeaderTeam(
+      theme,
+      difficulty,
+      pokemonPool,
+      region,
+      previous_team,
+      previous_lineups,
+      variation_seed,
+    );
+    result.team = await recommendTournamentLoadouts(result.team, pokemonPool);
+    result.showdown_text = formatShowdownTeam(result.team, result.theme, result.difficulty);
 
     // 3. Persist to engine_output
     const nativeRegionNote = region
@@ -106,30 +124,10 @@ export class Engine1Service {
       });
     }
 
-    const theme = parsed.theme ?? 'Unknown';
-    const difficulty = parsed.difficulty ?? 'unknown';
     const team = Array.isArray(parsed.team) ? parsed.team : [];
-
-    const lines: string[] = [
-      `=== ${theme} Gym Leader Team (${difficulty}) ===`,
-      '',
-    ];
-
-    for (const slot of team) {
-      const typeLine = slot.type_2
-        ? `${slot.type_1} / ${slot.type_2}`
-        : slot.type_1 ?? 'Unknown';
-
-      lines.push(
-        `${slot.name}`,
-        `Type: ${typeLine}`,
-        `Role: ${slot.role}`,
-        `- (moves not assigned — use Showdown teambuilder)`,
-        '',
-      );
-    }
-
-    return lines.join('\n');
+    const pokemonPool = await this.db.findPokemonByNames(team.map((slot) => slot.name));
+    const enrichedTeam = await recommendTournamentLoadouts(team, pokemonPool);
+    return formatShowdownTeam(enrichedTeam, parsed.theme, parsed.difficulty);
   }
 
   private async resolveEngineOutput(matchId?: number): Promise<EngineOutput> {

@@ -1,12 +1,17 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { TypeBadge } from '@/components/ui/TypeBadge';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { CounterScoreBar } from '@/components/engines/CounterScoreBar';
 import { MatchupTable } from '@/components/engines/MatchupTable';
 import { AuthGuard } from '@/components/ui/AuthGuard';
+import { ShowdownImportModal } from '@/components/ui/ShowdownImportModal';
+import { PokemonAutocomplete } from '@/components/ui/PokemonAutocomplete';
 import { api } from '@/lib/api';
+import { storeBattlePredictorDraft } from '@/lib/battle-transfer';
+import { parsePokemonCsv } from '@/lib/pokemon-import';
+import { useSessionState } from '@/hooks/useSessionState';
 import type { Engine2Response } from '@/types';
 
 /* ── Type colour map (mirrors Engine 1) ────────────────────── */
@@ -65,30 +70,54 @@ function PokemonSlotInput({ index, value, onChange }: { readonly index: number; 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
       <span className="pk-slot-number">{index + 1}</span>
-      <input
-        type="text"
+      <PokemonAutocomplete
+        id={`e2-slot-${index}`}
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={onChange}
+        onSelect={(pokemon) => onChange(pokemon.name)}
         placeholder={`Pokémon ${index + 1}`}
-        className="pk-input"
-        style={{ fontSize: '16px' }}
-        aria-label={`Opponent Pokémon slot ${index + 1}`}
       />
     </div>
   );
 }
 
 export default function Engine2Page() {
-  const [opponentSlots, setOpponentSlots] = useState<string[]>(['', '', '', '', '', '']);
-  const [challengerRegion, setChallengerRegion] = useState('Johto');
-  const [section, setSection] = useState('3ISC');
-  const [groupName, setGroupName] = useState('');
+  const [opponentSlots, setOpponentSlots] = useSessionState<string[]>('engine2.opponentSlots', ['', '', '', '']);
+  const [challengerRegion, setChallengerRegion] = useSessionState('engine2.challengerRegion', 'Johto');
+  const [section, setSection] = useSessionState('engine2.section', '3ISC');
+  const [groupName, setGroupName] = useSessionState('engine2.groupName', '');
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<Engine2Response | null>(null);
+  const [result, setResult] = useSessionState<Engine2Response | null>('engine2.result', null);
   const [error, setError] = useState<string | null>(null);
+  const [importModalOpen, setImportModalOpen] = useState(false);
+  const csvInputRef = useRef<HTMLInputElement>(null);
 
   function updateSlot(i: number, val: string) {
     setOpponentSlots((prev) => { const next = [...prev]; next[i] = val; return next; });
+  }
+
+  function handleTeamImported(teamNames: string[]) {
+    const next = ['', '', '', ''];
+    teamNames.slice(0, 4).forEach((name, i) => { next[i] = name; });
+    setOpponentSlots(next);
+  }
+
+  function handleCsvUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const names = parsePokemonCsv(String(event.target?.result ?? ''));
+      if (names.length === 0) {
+        setError('No Pokemon names were found in the CSV file.');
+        return;
+      }
+      setError(null);
+      handleTeamImported(names);
+    };
+    reader.onerror = () => setError('Could not read the CSV file.');
+    reader.readAsText(file);
+    e.target.value = '';
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -104,6 +133,59 @@ export default function Engine2Page() {
     } finally {
       setLoading(false);
     }
+  }
+
+  const [copied, setCopied] = useState(false);
+
+  function buildPSText(): string {
+    if (!result) return '';
+    if (result.showdown_text) return result.showdown_text;
+    return result.recommended_team.map((c) => {
+      if (!c.loadout) return c.name;
+      return [
+        `${c.name} @ ${c.loadout.item}`,
+        `Ability: ${c.loadout.ability}`,
+        `EVs: ${c.loadout.evs}`,
+        `${c.loadout.nature} Nature`,
+        ...c.loadout.moves.map((move) => `- ${move}`),
+      ].join('\n');
+    }).join('\n\n');
+  }
+
+  function handleCopyPS() {
+    const text = buildPSText();
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
+  function handleDownloadCSV() {
+    if (!result) return;
+    const header = 'rank,name,type_1,type_2,counter_score,tcs,sas,rs,knn,dt,reason';
+    const rows = result.recommended_team.map((c) =>
+      `${c.rank},"${c.name}","${c.type_1}","${c.type_2 ?? ''}",${c.counter_score},${c.score_breakdown.tcs},${c.score_breakdown.sas},${c.score_breakdown.rs},${c.score_breakdown.knn},${c.score_breakdown.dt},"${c.reason.replace(/"/g, '""')}"`
+    );
+    const csv = [header, ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'counter_team.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function handleSendToEngine3() {
+    if (!result) return;
+    const myTeam = result.recommended_team.map((c) => c.name);
+    const opponentTeam = opponentSlots.filter((s) => s.trim() !== '');
+    storeBattlePredictorDraft({ teamA: myTeam, teamB: opponentTeam });
+    sessionStorage.setItem('counter_team_transfer', JSON.stringify({
+      myTeam,
+      opponentTeam,
+    }));
+    window.location.href = '/engine3';
   }
 
   /* Derive reactive type from results if available */
@@ -248,13 +330,76 @@ export default function Engine2Page() {
               </div>
             </div>
 
-            {/* Label */}
-            <p className="pk-section-label">
-              <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
-                <polygon points="5,0 6.2,3.5 10,3.5 7,5.8 8.1,9 5,7 1.9,9 3,5.8 0,3.5 3.8,3.5" fill="currentColor" opacity="0.7"/>
-              </svg>
-              OPPONENT TEAM ROSTER
-            </p>
+            {/* Label + Import button row */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.5rem' }}>
+              <p className="pk-section-label" style={{ margin: 0 }}>
+                <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
+                  <polygon points="5,0 6.2,3.5 10,3.5 7,5.8 8.1,9 5,7 1.9,9 3,5.8 0,3.5 3.8,3.5" fill="currentColor" opacity="0.7"/>
+                </svg>
+                OPPONENT TEAM ROSTER
+              </p>
+              <input
+                ref={csvInputRef}
+                type="file"
+                accept=".csv,text/csv"
+                style={{ display: 'none' }}
+                onChange={handleCsvUpload}
+              />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={() => csvInputRef.current?.click()}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                  background: 'transparent',
+                  border: '1px solid rgba(248,208,48,0.4)',
+                  borderRadius: '0.4rem',
+                  color: '#F8D030',
+                  fontFamily: 'var(--font-pixel)',
+                  fontSize: '0.42rem',
+                  letterSpacing: '0.06em',
+                  padding: '0.35rem 0.75rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                CSV IMPORT
+              </button>
+              <button
+                type="button"
+                onClick={() => setImportModalOpen(true)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                  background: 'transparent',
+                  border: '1px solid rgba(104,144,240,0.4)',
+                  borderRadius: '0.4rem',
+                  color: '#6890F0',
+                  fontFamily: 'var(--font-pixel)',
+                  fontSize: '0.42rem',
+                  letterSpacing: '0.06em',
+                  padding: '0.35rem 0.75rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  whiteSpace: 'nowrap',
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.background = 'rgba(104,144,240,0.08)';
+                  (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(104,144,240,0.7)';
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.background = 'transparent';
+                  (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(104,144,240,0.4)';
+                }}
+              >
+                📥 IMPORT FROM SHOWDOWN
+              </button>
+              </div>
+            </div>
 
             {/* Slot grid */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.625rem', marginBottom: '1.25rem' }}>
@@ -376,11 +521,24 @@ export default function Engine2Page() {
                     return (
                       <div key={counter.name} className="pk-counter-card" style={{ '--card-accent': cColor.primary } as React.CSSProperties}>
                         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.5rem', marginBottom: '0.75rem' }}>
-                          <div>
-                            <h3 style={{ margin: '0 0 0.35rem', fontWeight: 800, color: 'var(--pk-text)', textTransform: 'capitalize', fontSize: 'clamp(0.9rem, 1.5vw, 1.05rem)' }}>{counter.name}</h3>
-                            <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
-                              <TypeBadge type={counter.type_1} />
-                              {counter.type_2 && <TypeBadge type={counter.type_2} />}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            {counter.pokeapi_id && (
+                              /* eslint-disable-next-line @next/next/no-img-element */
+                              <img
+                                src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${counter.pokeapi_id}.png`}
+                                alt={counter.name}
+                                width={56}
+                                height={56}
+                                style={{ imageRendering: 'pixelated', objectFit: 'contain', flexShrink: 0 }}
+                                loading="lazy"
+                              />
+                            )}
+                            <div>
+                              <h3 style={{ margin: '0 0 0.35rem', fontWeight: 800, color: 'var(--pk-text)', textTransform: 'capitalize', fontSize: 'clamp(0.9rem, 1.5vw, 1.05rem)' }}>{counter.name}</h3>
+                              <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
+                                <TypeBadge type={counter.type_1} />
+                                {counter.type_2 && <TypeBadge type={counter.type_2} />}
+                              </div>
                             </div>
                           </div>
                           <div style={{ textAlign: 'right', flexShrink: 0 }}>
@@ -392,13 +550,131 @@ export default function Engine2Page() {
                         <p style={{ margin: '0.75rem 0 0', fontSize: '0.75rem', color: 'var(--pk-text-muted)', lineHeight: 1.55, borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '0.625rem' }}>
                           {counter.reason}
                         </p>
+                        {counter.loadout && (
+                          <div style={{ marginTop: '0.75rem', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '0.625rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                            <div style={{ fontSize: '0.64rem', color: 'var(--pk-gold)', fontWeight: 700 }}>
+                              {counter.loadout.item}
+                            </div>
+                            <div style={{ fontSize: '0.6rem', color: 'var(--pk-text-muted)' }}>
+                              Ability: {counter.loadout.ability}
+                            </div>
+                            <div style={{ fontSize: '0.56rem', color: 'var(--pk-text-dim)' }}>
+                              {counter.loadout.evs}
+                            </div>
+                            <div style={{ fontSize: '0.56rem', color: 'var(--pk-text-dim)' }}>
+                              {counter.loadout.nature} Nature
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem', marginTop: '0.15rem' }}>
+                              {counter.loadout.moves.map((move) => (
+                                <span key={move} style={{ fontSize: '0.58rem', color: 'var(--pk-text-muted)' }}>- {move}</span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     );
                   })}
                 </div>
+
+                {/* Export bar */}
+                <div style={{ display: 'flex', gap: '0.625rem', flexWrap: 'wrap', marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+                  <button
+                    type="button"
+                    onClick={handleCopyPS}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 1rem', background: copied ? 'rgba(74,222,128,0.15)' : 'rgba(104,144,240,0.10)', border: `1px solid ${copied ? 'rgba(74,222,128,0.5)' : 'rgba(104,144,240,0.35)'}`, borderRadius: '0.4rem', color: copied ? '#4ADE80' : '#6890F0', fontFamily: 'var(--font-pixel)', fontSize: '0.42rem', letterSpacing: '0.06em', cursor: 'pointer', transition: 'all 0.15s' }}
+                  >
+                    {copied ? '✓ COPIED!' : '📋 COPY PS TEXT'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDownloadCSV}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 1rem', background: 'rgba(248,208,48,0.08)', border: '1px solid rgba(248,208,48,0.3)', borderRadius: '0.4rem', color: '#F8D030', fontFamily: 'var(--font-pixel)', fontSize: '0.42rem', letterSpacing: '0.06em', cursor: 'pointer', transition: 'all 0.15s' }}
+                  >
+                    ⬇ DOWNLOAD CSV
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSendToEngine3}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 1rem', background: 'rgba(239,68,68,0.10)', border: '1px solid rgba(239,68,68,0.35)', borderRadius: '0.4rem', color: '#EF4444', fontFamily: 'var(--font-pixel)', fontSize: '0.42rem', letterSpacing: '0.06em', cursor: 'pointer', transition: 'all 0.15s' }}
+                  >
+                    ⚔ TAKE TO BATTLE
+                  </button>
+                </div>
               </div>
             </div>
           </section>
+
+          {/* VS table */}
+          {result.recommended_team.length > 0 && (
+            <section aria-label="VS team comparison">
+              <p className="pk-section-label"><span aria-hidden="true">◆</span> MATCHUP PREVIEW</p>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '0', background: 'var(--pk-glass)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '0.75rem', overflow: 'hidden' }}>
+                {/* MY TEAM header */}
+                <div style={{ padding: '0.6rem 1rem', background: 'rgba(239,68,68,0.08)', borderBottom: '1px solid rgba(239,68,68,0.2)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <span style={{ fontFamily: 'var(--font-pixel)', fontSize: '0.45rem', color: '#EF4444', letterSpacing: '0.08em' }}>🔴 MY TEAM</span>
+                </div>
+                <div style={{ padding: '0.6rem 0.75rem', background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid rgba(255,255,255,0.07)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <span style={{ fontFamily: 'var(--font-pixel)', fontSize: '0.45rem', color: 'var(--pk-text-muted)' }}>VS</span>
+                </div>
+                {/* OPPONENT header */}
+                <div style={{ padding: '0.6rem 1rem', background: 'rgba(104,144,240,0.08)', borderBottom: '1px solid rgba(104,144,240,0.2)', display: 'flex', alignItems: 'center', gap: '0.4rem', justifyContent: 'flex-end' }}>
+                  <span style={{ fontFamily: 'var(--font-pixel)', fontSize: '0.45rem', color: '#6890F0', letterSpacing: '0.08em' }}>OPPONENT 🔵</span>
+                </div>
+
+                {/* Row pairs */}
+                {Array.from({ length: Math.max(result.recommended_team.length, (result.opponent_team_data ?? result.opponent_team).length) }).map((_, i) => {
+                  const counter = result.recommended_team[i];
+                  const opp = result.opponent_team_data?.[i] ?? (result.opponent_team[i] ? { name: result.opponent_team[i], pokeapi_id: undefined, type_1: undefined, type_2: undefined } : undefined);
+                  const isLast = i === Math.max(result.recommended_team.length, (result.opponent_team_data ?? result.opponent_team).length) - 1;
+                  const rowBorder = isLast ? 'none' : '1px solid rgba(255,255,255,0.05)';
+                  return (
+                    <React.Fragment key={i}>
+                      {/* Counter cell */}
+                      <div style={{ padding: '0.5rem 1rem', borderBottom: rowBorder, display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(239,68,68,0.03)' }}>
+                        {counter ? (
+                          <>
+                            {counter.pokeapi_id && (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${counter.pokeapi_id}.png`} alt={counter.name} width={40} height={40} style={{ imageRendering: 'pixelated', objectFit: 'contain', flexShrink: 0 }} loading="lazy" />
+                            )}
+                            <div>
+                              <p style={{ margin: 0, fontWeight: 700, fontSize: '0.82rem', color: 'var(--pk-text)', textTransform: 'capitalize' }}>{counter.name}</p>
+                              <div style={{ display: 'flex', gap: '0.2rem', marginTop: '0.15rem', flexWrap: 'wrap' }}>
+                                <TypeBadge type={counter.type_1} />
+                                {counter.type_2 && <TypeBadge type={counter.type_2} />}
+                              </div>
+                            </div>
+                          </>
+                        ) : <span style={{ color: 'var(--pk-text-dim)', fontSize: '0.75rem' }}>—</span>}
+                      </div>
+                      {/* VS divider cell */}
+                      <div style={{ padding: '0.5rem 0.75rem', borderBottom: rowBorder, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.01)' }}>
+                        <span style={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.2)', fontFamily: 'var(--font-pixel)' }}>⚔</span>
+                      </div>
+                      {/* Opponent cell */}
+                      <div style={{ padding: '0.5rem 1rem', borderBottom: rowBorder, display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'flex-end', background: 'rgba(104,144,240,0.03)' }}>
+                        {opp ? (
+                          <>
+                            <div style={{ textAlign: 'right' }}>
+                              <p style={{ margin: 0, fontWeight: 700, fontSize: '0.82rem', color: 'var(--pk-text)', textTransform: 'capitalize' }}>{opp.name}</p>
+                              <div style={{ display: 'flex', gap: '0.2rem', marginTop: '0.15rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                                {opp.type_1 && <TypeBadge type={opp.type_1} />}
+                                {opp.type_2 && <TypeBadge type={opp.type_2} />}
+                              </div>
+                            </div>
+                            {opp.pokeapi_id && (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${opp.pokeapi_id}.png`} alt={opp.name} width={40} height={40} style={{ imageRendering: 'pixelated', objectFit: 'contain', flexShrink: 0 }} loading="lazy" />
+                            )}
+                          </>
+                        ) : <span style={{ color: 'var(--pk-text-dim)', fontSize: '0.75rem' }}>—</span>}
+                      </div>
+                    </React.Fragment>
+                  );
+                })}
+              </div>
+            </section>
+          )}
 
           {/* Matchup table */}
           {result.opponent_team.length > 0 && counterNames.length > 0 && (
@@ -412,6 +688,12 @@ export default function Engine2Page() {
         </div>
       )}
     </div>
+
+    <ShowdownImportModal
+      isOpen={importModalOpen}
+      onClose={() => setImportModalOpen(false)}
+      onTeamImported={handleTeamImported}
+    />
     </AuthGuard>
   );
 }
