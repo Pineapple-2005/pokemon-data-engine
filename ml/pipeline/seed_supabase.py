@@ -94,6 +94,8 @@ _POKEMON_DATA_COLS: list[str] = [
     "attack_ratio",
     "special_attack_ratio",
     "speed_tier",
+    "speed_tier_encoded",
+    "type_coverage_score",
     # Role + assignment
     "role_label",
     "is_assigned",
@@ -242,11 +244,23 @@ def _df_to_rows(df, cols: list[str]) -> list[tuple]:
     """
     import numpy as np
 
+    _SPEED_TIER_ENCODE = {"slow": 0, "medium": 1, "fast": 2}
+
     df = df.rename(columns=_RENAME_MAP).copy()
 
     # Derive generation if not already present
     if "generation" not in df.columns and "pokeapi_id" in df.columns:
         df["generation"] = df["pokeapi_id"].apply(_get_generation)
+
+    # Derive speed_tier_encoded from speed_tier if missing
+    if "speed_tier_encoded" not in df.columns and "speed_tier" in df.columns:
+        df["speed_tier_encoded"] = df["speed_tier"].map(_SPEED_TIER_ENCODE).fillna(1).astype(int)
+
+    # Derive type_coverage_score from weakness/resistance counts if missing
+    if "type_coverage_score" not in df.columns:
+        wc = df.get("weakness_count", 0)
+        rc = df.get("resistance_count", 0)
+        df["type_coverage_score"] = (rc - wc).clip(lower=0).fillna(0).astype(int)
 
     rows = []
     for _, row in df.iterrows():

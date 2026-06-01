@@ -721,7 +721,7 @@ export default function DashboardPage() {
       <div className="pk-page-glow" aria-hidden="true" />
 
       {/* ── Trainer Card hero ─────────────────────────────── */}
-      <header className="pk-dashboard-header holo-card">
+      <header className="pk-dashboard-header">
         <TrainerCard
           totalPokemon={totalPokemon}
           assignedPokemon={assignedPokemon}
