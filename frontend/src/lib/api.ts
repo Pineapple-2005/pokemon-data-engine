@@ -17,7 +17,7 @@ import type {
 } from '@/types';
 import { getAuthHeader } from './auth';
 
-const BASE = process.env.NEXT_PUBLIC_API_URL || '/api';
+const BASE = '/api';
 
 /** All NestJS responses are wrapped in { success: true, data: T }. */
 interface ApiEnvelope<T> { success: boolean; data: T }
