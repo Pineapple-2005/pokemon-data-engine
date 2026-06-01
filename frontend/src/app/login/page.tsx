@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { storeUser } from '@/lib/auth';
 import { PokemonAutocomplete } from '@/components/ui/PokemonAutocomplete';
+import { PokemonIntro } from '@/components/ui/PokemonIntro';
 import { getPokeapiId } from '@/lib/pokemon-ids';
 import type { Pokemon } from '@/types';
 
@@ -214,6 +215,9 @@ export default function LoginPage() {
         padding: '1.5rem',
       }}
     >
+      {/* Boot sequence intro — self-managing, fires once per session */}
+      <PokemonIntro />
+
       {/* Ambient glow */}
       <div
         aria-hidden="true"
@@ -224,6 +228,40 @@ export default function LoginPage() {
           pointerEvents: 'none',
         }}
       />
+
+      {/* Falling pokeballs background */}
+      {[
+        { left: '8%',  delay: '0s',   duration: '5.2s' },
+        { left: '21%', delay: '1.3s', duration: '6.1s' },
+        { left: '36%', delay: '0.7s', duration: '5.7s' },
+        { left: '51%', delay: '2.1s', duration: '4.9s' },
+        { left: '64%', delay: '0.4s', duration: '5.5s' },
+        { left: '79%', delay: '1.8s', duration: '6.3s' },
+      ].map((b) => (
+        <div
+          key={b.left}
+          aria-hidden="true"
+          style={{
+            position: 'fixed',
+            left: b.left,
+            top: '-60px',
+            zIndex: 0,
+            pointerEvents: 'none',
+            animation: `intro-pokeball-fall ${b.duration} ease-in infinite`,
+            animationDelay: b.delay,
+            opacity: 0.06,
+          }}
+        >
+          <svg width="24" height="24" viewBox="0 0 40 40" aria-hidden="true">
+            <circle cx="20" cy="20" r="18" fill="none" stroke="#333" strokeWidth="2" />
+            <path d="M2 20 A18 18 0 0 1 38 20" fill="#DC2626" />
+            <path d="M38 20 A18 18 0 0 1 2 20" fill="#F8FAFC" />
+            <line x1="2" y1="20" x2="38" y2="20" stroke="#111" strokeWidth="2.5" />
+            <circle cx="20" cy="20" r="5" fill="#111" />
+            <circle cx="20" cy="20" r="2.8" fill="#F8FAFC" />
+          </svg>
+        </div>
+      ))}
 
       {/* ── STEP 2: Trainer Customization ─────────────────────────────────── */}
       {isRegister && step === 2 ? (
@@ -511,7 +549,7 @@ export default function LoginPage() {
           }}
         >
           {/* Pokéball SVG logo */}
-          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.25rem' }}>
+          <div className="animate-glow" style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.25rem' }}>
             <svg width="56" height="56" viewBox="0 0 40 40" aria-hidden="true" style={{ filter: 'drop-shadow(0 0 10px rgba(239,68,68,0.45))' }}>
               <circle cx="20" cy="20" r="18" fill="none" stroke="rgba(239,68,68,0.5)" strokeWidth="1.5" />
               <path d="M2 20 A18 18 0 0 1 38 20" fill="#DC2626" />
@@ -526,6 +564,19 @@ export default function LoginPage() {
           <h1 style={{ margin: '0 0 0.25rem', fontFamily: 'var(--font-pixel)', fontSize: 'clamp(0.6rem, 2vw, 0.75rem)', color: 'var(--pk-red)', letterSpacing: '0.12em', textAlign: 'center' }}>
             POKEMON DATA ENGINE
           </h1>
+
+          {/* Version badge */}
+          <div style={{ marginTop: '0.5rem', marginBottom: '1.5rem', display: 'flex', justifyContent: 'center' }}>
+            <span style={{
+              fontFamily: 'var(--font-pixel)', fontSize: '0.35rem',
+              color: '#F8D030', border: '1px solid rgba(248,208,48,0.35)',
+              borderRadius: '0.25rem', padding: '0.2rem 0.6rem',
+              letterSpacing: '0.08em', background: 'rgba(248,208,48,0.06)',
+            }}>
+              GEN 1-9 · BATTLE SYSTEM · DATA ENGINE
+            </span>
+          </div>
+
           <p style={{ margin: '0 0 1.75rem', fontFamily: 'var(--font-pixel)', fontSize: 'clamp(0.52rem, 1.5vw, 0.62rem)', color: 'var(--pk-text-muted)', letterSpacing: '0.1em', textAlign: 'center' }}>
             {isRegister ? 'CREATE ACCOUNT' : 'TRAINER LOGIN'}
           </p>
