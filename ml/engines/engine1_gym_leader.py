@@ -187,19 +187,22 @@ def _cluster_role_label(cluster_members: list[dict]) -> str:
 # ---------------------------------------------------------------------------
 
 def generate_team(
-    theme: str,
-    difficulty: str,
-    pokemon_pool: list[dict],
+    themes: Optional[list[str]] = None,
+    difficulty: str = "medium",
+    pokemon_pool: list[dict] = None,
     previous_team: Optional[list[str]] = None,
     previous_lineups: Optional[list[list[str]]] = None,
     variation_seed: Optional[int] = None,
+    # backward-compat: old callers pass theme= as a positional/keyword arg
+    theme: Optional[str] = None,
 ) -> dict:
     """
     Core logic for Engine 1.
 
     Parameters
     ----------
-    theme       : one of TYPES or "balanced"
+    themes      : list of Pokémon types (e.g. ["steel", "water"]) or ["balanced"]
+    theme       : (legacy) single type string — ignored when themes is provided
     difficulty  : "easy" | "medium" | "hard"
     pokemon_pool: list of Pokémon dicts from NestJS (pre-enriched with role_label, stats)
 
@@ -207,7 +210,18 @@ def generate_team(
     -------
     dict matching the Engine1Response schema
     """
-    theme = theme.lower()
+    # Resolve themes list — support both old single-theme and new multi-theme callers
+    if themes is None or len(themes) == 0:
+        # fall back to legacy theme kwarg
+        themes = [theme if theme is not None else "balanced"]
+    themes = [t.lower() for t in themes]
+
+    # Keep a single theme string for output/logging (joined when multiple)
+    theme_label = "/".join(themes)
+
+    if pokemon_pool is None:
+        raise ValueError("pokemon_pool is required")
+
     difficulty = difficulty.lower()
     previous_names = {name.lower() for name in (previous_team or [])}
     known_lineups = {
@@ -220,19 +234,19 @@ def generate_team(
         raise ValueError("No Pokémon available for theme")
 
     # ------------------------------------------------------------------
-    # Step 1 — Filter pool by theme
+    # Step 1 — Filter pool by themes (ANY theme in the list matches)
     # ------------------------------------------------------------------
-    if theme == "balanced":
+    if themes == ["balanced"]:
         filtered = list(pokemon_pool)
     else:
         filtered = [
             p for p in pokemon_pool
-            if (p.get("type_1") or "").lower() == theme
-            or (p.get("type_2") or "").lower() == theme
+            if (p.get("type_1") or "").lower() in themes
+            or (p.get("type_2") or "").lower() in themes
         ]
 
     if not filtered:
-        raise ValueError(f"No Pokémon available for theme '{theme}'")
+        raise ValueError(f"No Pokémon available for theme '{theme_label}'")
 
     # ------------------------------------------------------------------
     # Step 2 — Apply difficulty scaling (filter by total_base_stats)
@@ -340,8 +354,13 @@ def generate_team(
     # ------------------------------------------------------------------
     # Step 7 — Cosine Similarity: compute theme centroid, select Ace
     # ------------------------------------------------------------------
-    if theme != "balanced":
-        theme_members = [p for p in working_pool if (p.get("type_1") or "").lower() == theme]
+    if themes != ["balanced"]:
+        # theme_members = any Pokémon whose type1 or type2 is in the themes list
+        theme_members = [
+            p for p in working_pool
+            if (p.get("type_1") or "").lower() in themes
+            or (p.get("type_2") or "").lower() in themes
+        ]
         if not theme_members:
             theme_members = working_pool
         centroid = np.mean(X_raw[[p["_original_index"] for p in theme_members]], axis=0).reshape(1, -1)
@@ -450,10 +469,11 @@ def generate_team(
         selected_indices.append(pick["_original_index"])
         used_names.add(pick["name"])
 
-    # Fallback: themed pool too small — fill remaining slots from full pokemon_pool
+    # Fallback: themed pool too small — fill remaining slots from type-filtered pool
+    # (using `filtered` not `pokemon_pool` to avoid off-type Pokémon appearing)
     if len(selected_team) < REQUIRED_TEAM_SIZE:
         while len(selected_team) < REQUIRED_TEAM_SIZE:
-            fallback_pool = [p for p in pokemon_pool if p.get("name") not in used_names]
+            fallback_pool = [p for p in filtered if p.get("name") not in used_names]
             p = _weighted_quality_pick(
                 fallback_pool,
                 lambda candidate: _safe_float(candidate.get("total_base_stats", candidate.get("total", 300))) / 600.0,
@@ -530,14 +550,14 @@ def generate_team(
             "type_2": p.get("type_2"),
             "total_base_stats": int(_safe_float(p.get("total_base_stats", p.get("total", 0)))),
             "usefulness_score": round(p["_usefulness_score"], 4),
-            "reason": _build_slot_reason(p, role, theme),
+            "reason": _build_slot_reason(p, role, theme_label),
         })
 
     roles_summary = ", ".join(
         f"{s['role']} ({s['name'].title()})" for s in team_slots
     )
     explanation = (
-        f"Team built around {theme.title()} theme with roles: {roles_summary}. "
+        f"Team built around {theme_label.title()} theme with roles: {roles_summary}. "
         f"Difficulty: {difficulty}. "
         f"Assembly used KMeans clustering, Decision Tree role assignment, "
         f"Random Forest usefulness scoring, and Gower diversity enforcement."
@@ -545,7 +565,7 @@ def generate_team(
     )
 
     return {
-        "theme": theme,
+        "theme": theme_label,
         "difficulty": difficulty,
         "team": team_slots,
         "model_used": "kmeans+dt+rf+cosine+gower",

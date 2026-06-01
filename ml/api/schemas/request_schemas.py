@@ -71,8 +71,20 @@ class PokemonData(BaseModel):
 # ENGINE 1 — Gym Leader Team Generator
 # ===========================================================================
 
+_VALID_THEMES = {
+    "normal", "fire", "water", "electric", "grass", "ice",
+    "fighting", "poison", "ground", "flying", "psychic", "bug",
+    "rock", "ghost", "dragon", "dark", "steel", "fairy", "balanced",
+}
+
+
 class Engine1Request(BaseModel):
-    theme: str = Field(..., description="One of the 18 Pokémon types or 'balanced'")
+    # Legacy single-theme field — kept optional for backward compat.
+    # When `themes` is non-empty, `theme` is ignored.
+    theme: str = Field("balanced", description="One of the 18 Pokémon types or 'balanced' (legacy; use themes)")
+    # New multi-type field. When non-empty, overrides `theme`.
+    themes: list[str] = Field(default_factory=list, description="List of Pokémon types; overrides theme when non-empty")
+
     difficulty: str = Field("medium", description="easy | medium | hard")
     pokemon_pool: list[PokemonData] = Field(..., min_length=1)
     previous_team: list[str] = Field(default_factory=list)
@@ -82,14 +94,37 @@ class Engine1Request(BaseModel):
     @field_validator("theme")
     @classmethod
     def theme_must_be_valid(cls, v: str) -> str:
-        valid = {
-            "normal", "fire", "water", "electric", "grass", "ice",
-            "fighting", "poison", "ground", "flying", "psychic", "bug",
-            "rock", "ghost", "dragon", "dark", "steel", "fairy", "balanced",
-        }
-        if v.lower() not in valid:
+        if v.lower() not in _VALID_THEMES:
             raise ValueError(f"theme '{v}' is not a valid Pokémon type or 'balanced'")
         return v.lower()
+
+    @field_validator("themes", mode="before")
+    @classmethod
+    def themes_must_be_valid(cls, v: Any) -> list[str]:
+        if not isinstance(v, list):
+            return v  # let Pydantic's own type error surface
+        result = []
+        for item in v:
+            s = str(item).lower()
+            if s not in _VALID_THEMES:
+                raise ValueError(f"themes entry '{item}' is not a valid Pokémon type or 'balanced'")
+            result.append(s)
+        return result
+
+    @model_validator(mode="after")
+    def resolve_themes(self) -> "Engine1Request":
+        """
+        Normalise the themes list:
+        - If themes is non-empty, it takes precedence and theme is ignored.
+        - If themes is empty, copy theme into themes for backward compat.
+        """
+        if self.themes:
+            # themes is authoritative; leave theme as-is (it's just a legacy field)
+            pass
+        else:
+            # Legacy path: promote single theme to the list
+            self.themes = [self.theme]
+        return self
 
     @field_validator("difficulty")
     @classmethod
@@ -119,12 +154,21 @@ class Engine1Metrics(BaseModel):
 
 
 class Engine1Response(BaseModel):
+    # The engine returns theme as a "/" joined string (e.g. "steel/water").
+    # We keep it for backward compat and also expose themes as a parsed list.
     theme: str
     difficulty: str
     team: list[TeamSlot]
     model_used: str
     metrics: Engine1Metrics
     explanation: str
+
+    @property
+    def themes(self) -> list[str]:
+        """Backward-compat alias: split the joined theme string into a list."""
+        return self.theme.split("/")
+
+    model_config = {"extra": "allow"}
 
 
 # ===========================================================================
