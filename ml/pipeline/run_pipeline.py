@@ -37,8 +37,13 @@ from utils.name_normalizer import load_assigned_csv
 REGION_RANGES: dict[str, tuple[int, int]] = {
     "kanto":  (0,   151),
     "johto":  (151, 100),
+    "hoenn":  (251, 135),
+    "sinnoh": (386, 107),
+    "unova":  (493, 156),
     "kalos":  (649,  72),
     "alola":  (721,  88),
+    "galar":  (809,  96),
+    "paldea": (905, 120),
 }
 
 
@@ -105,8 +110,9 @@ def _parse_args() -> argparse.Namespace:
         default=None,
         choices=list(REGION_RANGES.keys()) + ["all"],
         help=(
-            "Region to fetch: kanto (1-151), johto (152-251), "
-            "kalos (650-721), alola (722-809), or all. "
+            "Region to fetch: kanto (1-151), johto (152-251), hoenn (252-386), "
+            "sinnoh (387-493), unova (494-649), kalos (650-721), alola (722-809), "
+            "galar (810-905), paldea (906-1025), or all. "
             "Overrides --limit when specified."
         ),
     )

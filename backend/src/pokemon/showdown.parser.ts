@@ -17,7 +17,7 @@ interface ShowdownExportSlot {
 // ---------------------------------------------------------------------------
 // Generated team export settings
 // ---------------------------------------------------------------------------
-const TEAM_SIZE_LIMIT = 4
+const TEAM_SIZE_LIMIT = 6
 
 const NAME_ALIASES: Record<string, string> = {
   'farfetch’d': "farfetch'd",

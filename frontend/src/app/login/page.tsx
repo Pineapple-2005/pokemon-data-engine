@@ -11,6 +11,18 @@ import type { Pokemon } from '@/types';
 
 type Mode = 'login' | 'register';
 
+const TYPE_BADGES: Array<{ color: string; label: string }> = [
+  { color: '#F08030', label: 'FIRE' },
+  { color: '#6890F0', label: 'WATER' },
+  { color: '#78C850', label: 'GRASS' },
+  { color: '#F8D030', label: 'ELEC' },
+  { color: '#A890F0', label: 'FLY' },
+  { color: '#C03028', label: 'FIGHT' },
+  { color: '#7038F8', label: 'DRAGON' },
+  { color: '#EE99AC', label: 'FAIRY' },
+  { color: '#705898', label: 'GHOST' },
+];
+
 // ── Trainer class picker data ────────────────────────────────────────────────
 const TRAINER_CLASSES = [
   'youngster', 'lass', 'bugcatcher', 'hiker', 'beauty', 'biker', 'blackbelt',
@@ -539,7 +551,6 @@ export default function LoginPage() {
           </form>
         </div>
       ) : (
-        /* ── LOGIN / REGISTER STEP 1 ─────────────────── */
         <div style={{
           display: 'flex',
           flexDirection: 'column',
@@ -550,6 +561,7 @@ export default function LoginPage() {
           position: 'relative',
         }}>
 
+          {/* ── Game title above the card ─────────────── */}
           <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
             {/* Pokeball logo */}
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.875rem' }}>
@@ -598,8 +610,186 @@ export default function LoginPage() {
             </span>
           </div>
 
-        </div>
+          {/* Card */}
+          <div
+            className="pk-login-card pk-login-card-animated"
+            style={{
+              width: '100%',
+              background: '#0d1120',
+              border: '2px solid rgba(239,68,68,0.4)',
+              borderRadius: '0.875rem',
+              padding: '2rem',
+              boxShadow: '0 0 40px rgba(239,68,68,0.12)',
+              position: 'relative',
+              overflow: 'hidden',
+            }}
+          >
+            {/* Decorative overlays */}
+            <div aria-hidden="true" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 0, opacity: 0.04, background: '#000' }} />
+            <div aria-hidden="true" style={{ position: 'absolute', right: '-40px', top: '-40px', width: '160px', height: '160px', borderRadius: '50%', border: '20px solid rgba(239,68,68,0.04)', pointerEvents: 'none', zIndex: 0 }} />
+
+            {/* Card content — z-index 1 so it's above decorations */}
+            <div style={{ position: 'relative', zIndex: 1 }}>
+
+              {/* Subtitle — TRAINER LOGIN / CREATE ACCOUNT */}
+              <p style={{
+                margin: '0 0 1.5rem',
+                fontFamily: 'var(--font-pixel)',
+                fontSize: 'clamp(0.48rem, 1.8vw, 0.6rem)',
+                color: 'var(--pk-text-muted)',
+                letterSpacing: '0.12em',
+                textAlign: 'center',
+                textTransform: 'uppercase',
+              }}>
+                ◆ {isRegister ? 'CREATE ACCOUNT' : 'TRAINER LOGIN'} ◆
+              </p>
+
+              {/* Error box */}
+              {error && (
+                <div role="alert" style={{
+                  background: 'rgba(239,68,68,0.1)',
+                  border: '1px solid rgba(239,68,68,0.45)',
+                  borderRadius: '0.5rem',
+                  padding: '0.625rem 0.875rem',
+                  marginBottom: '1.25rem',
+                }}>
+                  <span style={{ display: 'block', fontFamily: 'var(--font-pixel)', fontSize: '0.48rem', color: 'var(--pk-red)', letterSpacing: '0.08em', marginBottom: '0.25rem' }}>
+                    ▶ ERROR
+                  </span>
+                  <span style={{ fontFamily: 'var(--font-body)', fontSize: '0.8rem', color: 'rgba(239,68,68,0.85)', lineHeight: 1.5 }}>{error}</span>
+                </div>
+              )}
+
+              <form onSubmit={isRegister ? handleNextStep : handleSubmit} noValidate>
+                {/* Username */}
+                <div style={{ marginBottom: '1rem' }}>
+                  <label htmlFor="login-username" style={labelStyle}>USERNAME</label>
+                  <input
+                    id="login-username"
+                    type="text"
+                    className="pk-input"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    autoComplete="username"
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    disabled={loading}
+                    placeholder="TRAINER NAME"
+                    style={inputStyle}
+                  />
+                </div>
+
+                {/* Password */}
+                <div style={{ marginBottom: isRegister ? '1rem' : '1.5rem' }}>
+                  <label htmlFor="login-password" style={labelStyle}>PASSWORD</label>
+                  <input
+                    id="login-password"
+                    type="password"
+                    className="pk-input"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    autoComplete={isRegister ? 'new-password' : 'current-password'}
+                    disabled={loading}
+                    placeholder="••••••••"
+                    style={inputStyle}
+                  />
+                </div>
+
+                {/* Register-only: Section */}
+                {isRegister && (
+                  <div style={{ marginBottom: '1.5rem' }}>
+                    <label htmlFor="login-section" style={labelStyle}>
+                      SECTION <span style={{ color: 'var(--pk-text-muted)', opacity: 0.5 }}>(optional)</span>
+                    </label>
+                    <input
+                      id="login-section"
+                      type="text"
+                      className="pk-input"
+                      value={section}
+                      onChange={(e) => setSection(e.target.value)}
+                      disabled={loading}
+                      placeholder="3ISC"
+                      style={inputStyle}
+                    />
+                  </div>
+                )}
+
+                {/* Submit button */}
+                <button
+                  type="submit"
+                  disabled={loading}
+                  style={submitBtnStyle(loading)}
+                >
+                  {loading && (
+                    <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ animation: 'spin 0.8s linear infinite', flexShrink: 0 }}>
+                      <circle cx="12" cy="12" r="10" stroke="rgba(255,255,255,0.3)" strokeWidth="3" />
+                      <path d="M12 2 A10 10 0 0 1 22 12" stroke="white" strokeWidth="3" strokeLinecap="round" />
+                    </svg>
+                  )}
+                  {loading
+                    ? (isRegister ? 'LOADING...' : 'LOGGING IN...')
+                    : (isRegister ? 'NEXT →' : '▶ LOG IN')
+                  }
+                </button>
+              </form>
+
+              {/* Mode toggle */}
+              <div style={{ marginTop: '1.25rem', textAlign: 'center' }}>
+                {isRegister ? (
+                  <button
+                    type="button"
+                    onClick={() => switchMode('login')}
+                    style={{ background: 'none', border: 'none', color: 'var(--pk-text-muted)', fontFamily: 'var(--font-pixel)', fontSize: '0.48rem', letterSpacing: '0.08em', cursor: 'pointer', padding: '0.25rem', transition: 'color 0.15s ease' }}
+                  >
+                    Already registered? Log In
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => switchMode('register')}
+                    style={{ background: 'none', border: 'none', color: 'var(--pk-text-muted)', fontFamily: 'var(--font-pixel)', fontSize: '0.48rem', letterSpacing: '0.08em', cursor: 'pointer', padding: '0.25rem', transition: 'color 0.15s ease' }}
+                  >
+                    New trainer? Create Account
+                  </button>
+                )}
+              </div>
+
+            </div>{/* end card content */}
+          </div>{/* end card */}
+
+          {/* ── Type badges — properly BELOW the card ────── */}
+          <div style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '4px',
+            justifyContent: 'center',
+            marginTop: '1rem',
+            opacity: 0.7,
+          }}>
+            {TYPE_BADGES.map(({ color, label }) => (
+              <span key={label} style={{
+                fontFamily: 'var(--font-pixel)',
+                fontSize: '0.26rem',
+                letterSpacing: '0.04em',
+                padding: '0.15rem 0.45rem',
+                borderRadius: '999px',
+                background: `${color}18`,
+                border: `1px solid ${color}44`,
+                color,
+              }}>
+                {label}
+              </span>
+            ))}
+          </div>
+
+        </div>{/* end outer wrapper */}
       )}
+
+      <style>{`
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
 }
