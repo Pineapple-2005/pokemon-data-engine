@@ -86,7 +86,7 @@ export function PokemonIntro() {
   const [displayedText, setDisplayedText] = useState('');
   const [typingDone, setTypingDone] = useState(false);
   const [cursorBlink, setCursorBlink] = useState(false);
-  const [skipVisible, setSkipVisible] = useState(false);
+  const [skipVisible, setSkipVisible] = useState(true);
   const [silhouetteVisible, setSilhouetteVisible] = useState(false);
 
   const phaseRef = useRef<Phase>(0);
@@ -108,11 +108,11 @@ export function PokemonIntro() {
     phaseTimersRef.current.push(t);
   }, []);
 
-  // Skip on keydown or click (phase > 0)
+  // Skip on keydown or click
   useEffect(() => {
     if (!show) return;
     function onKey() {
-      if (phaseRef.current > 0) finish();
+      finish();
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -164,9 +164,6 @@ export function PokemonIntro() {
       setPhase(3);
       setDialogueVisible(true);
     }, 4000);
-
-    // Skip hint at 1500ms
-    addTimer(() => setSkipVisible(true), 1500);
 
     return () => {
       phaseTimersRef.current.forEach((t) => clearTimeout(t));
@@ -265,7 +262,7 @@ export function PokemonIntro() {
       {/* ── Full-screen overlay ─────────────────────────────────────── */}
       <div
         role="presentation"
-        onClick={() => { if (phaseRef.current > 0) finish(); }}
+        onClick={() => { finish(); }}
         style={{
           position: 'fixed',
           inset: 0,
@@ -577,7 +574,7 @@ export function PokemonIntro() {
         )}
 
         {/* Skip hint */}
-        {skipVisible && phase < 3 && (
+        {skipVisible && phase < 4 && (
           <div
             aria-hidden="true"
             style={{
