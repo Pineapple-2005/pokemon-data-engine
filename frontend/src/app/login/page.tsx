@@ -782,7 +782,7 @@ export default function LoginPage() {
             ))}
           </div>
 
-        </div>{/* end outer wrapper */}
+        </div>
       )}
 
       <style>{`
