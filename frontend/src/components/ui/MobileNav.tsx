@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { getStoredUser, clearUser } from '@/lib/auth';
 
 const SPRITE_BASE = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon';
 
@@ -96,12 +97,27 @@ function sheetItemStyle(isActive: boolean): React.CSSProperties {
 
 export function MobileNav() {
   const pathname = usePathname();
+  const router = useRouter();
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [trainerName, setTrainerName] = useState<string | null>(null);
 
   // Close sheet on navigation
   useEffect(() => {
     setSheetOpen(false);
   }, [pathname]);
+
+  // Sync auth state — re-read on every pathname change so login/logout reflects immediately
+  useEffect(() => {
+    const user = getStoredUser();
+    setTrainerName(user ? (user.display_name ?? user.username) : null);
+  }, [pathname]);
+
+  function handleLogout() {
+    clearUser();
+    setTrainerName(null);
+    setSheetOpen(false);
+    router.replace('/login');
+  }
 
   if (pathname === '/login') return null;
 
@@ -153,6 +169,7 @@ export function MobileNav() {
           onClick={() => setSheetOpen(true)}
           aria-label="Show all navigation pages"
           aria-expanded={sheetOpen}
+          aria-haspopup="dialog"
           style={{
             ...tabStyle(false),
             background: 'transparent',
@@ -187,11 +204,15 @@ export function MobileNav() {
       </nav>
 
       {/* ── Full-screen sheet overlay ─────────────────────────────── */}
+      {/*
+        S6819: Use <dialog> instead of role="dialog" div.
+        The CSS classes (pk-nav-sheet / pk-nav-sheet.open) are kept on the
+        wrapper so the existing open/close transition still works — <dialog>
+        itself is unstyled and positioned absolute inside the wrapper.
+      */}
       <div
         className={`pk-nav-sheet${sheetOpen ? ' open' : ''}`}
-        aria-hidden={!sheetOpen}
-        role="dialog"
-        aria-label="All navigation pages"
+        aria-hidden={sheetOpen ? undefined : true}
       >
         {/* Backdrop */}
         <div
@@ -200,8 +221,44 @@ export function MobileNav() {
           aria-hidden="true"
         />
 
-        {/* Sheet panel */}
-        <div className="pk-nav-sheet-panel" style={{ position: 'relative', zIndex: 1 }}>
+        {/* Sheet panel — semantic <dialog> element */}
+        <dialog
+          open={sheetOpen}
+          aria-label="All navigation pages"
+          className="pk-nav-sheet-panel"
+          style={{ position: 'relative', zIndex: 1, border: 'none', padding: 0, background: 'none', width: '100%', maxWidth: '100%', margin: 0 }}
+        >
+          {/* ── Auth row ──────────────────────────────────────── */}
+          <div className="pk-nav-sheet-auth-row">
+            {trainerName !== null ? (
+              <>
+                <span className="pk-nav-sheet-trainer-name">
+                  ▶ {trainerName.toUpperCase().slice(0, 14)}
+                </span>
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="pk-nav-sheet-auth-btn pk-nav-sheet-auth-btn--logout"
+                >
+                  LOG OUT
+                </button>
+              </>
+            ) : (
+              <>
+                <span className="pk-nav-sheet-trainer-name pk-nav-sheet-trainer-name--guest">
+                  ○ NOT LOGGED IN
+                </span>
+                <Link
+                  href="/login"
+                  className="pk-nav-sheet-auth-btn pk-nav-sheet-auth-btn--login"
+                  onClick={() => setSheetOpen(false)}
+                >
+                  LOG IN
+                </Link>
+              </>
+            )}
+          </div>
+
           {/* Title row */}
           <div
             style={{
@@ -289,7 +346,7 @@ export function MobileNav() {
               );
             })}
           </div>
-        </div>
+        </dialog>
       </div>
     </>
   );

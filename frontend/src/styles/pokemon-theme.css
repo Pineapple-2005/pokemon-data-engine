@@ -2892,3 +2892,24 @@ html, body {
     width: 140px !important;
   }
 }
+
+/* ── Login card animated border ─────────────────────── */
+@keyframes login-border-glow {
+  0%, 100% { border-color: rgba(239,68,68,0.35); box-shadow: 0 0 40px rgba(239,68,68,0.1), 0 20px 60px rgba(0,0,0,0.6); }
+  50%       { border-color: rgba(239,68,68,0.65); box-shadow: 0 0 60px rgba(239,68,68,0.22), 0 20px 60px rgba(0,0,0,0.6); }
+}
+.pk-login-card-animated {
+  animation: login-border-glow 3s ease-in-out infinite;
+}
+
+/* ── Dashboard mobile responsive ────────────────────── */
+@media (max-width: 768px) {
+  .pk-dashboard-header {
+    flex-direction: column;
+  }
+  .pk-dashboard-header > *:first-child {
+    max-width: 100% !important;
+    width: 100% !important;
+    flex: none !important;
+  }
+}
