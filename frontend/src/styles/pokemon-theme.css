@@ -2867,10 +2867,14 @@ html, body {
 @media (max-width: 768px) {
   /* Login card fits mobile screen */
   .pk-login-card {
-    padding: 1.5rem !important;
-    max-width: 100% !important;
-    margin: 0 !important;
+    padding: clamp(1.25rem, 5vw, 1.75rem) !important;
     border-radius: 0.75rem !important;
+  }
+  /* On mobile, the outer container pads properly */
+  .pk-login-outer {
+    padding: 1rem !important;
+    align-items: flex-start !important;
+    padding-top: 2rem !important;
   }
 
   /* Intro overlay: scale text for small screens */
