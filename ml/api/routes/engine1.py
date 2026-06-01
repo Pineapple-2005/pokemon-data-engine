@@ -33,8 +33,10 @@ async def generate_gym_leader_team(request: Engine1Request) -> Engine1Response:
         # Convert Pydantic models to plain dicts so engine receives dicts
         pool_dicts = [p.model_dump() for p in request.pokemon_pool]
 
+        # Use the resolved themes list (always non-empty after model_validator).
+        # Single-theme legacy calls produce themes=["steel"] — engine handles both.
         result = generate_team(
-            theme=request.theme,
+            themes=request.themes if request.themes else [request.theme],
             difficulty=request.difficulty,
             pokemon_pool=pool_dicts,
             previous_team=request.previous_team,

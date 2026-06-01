@@ -19,8 +19,15 @@ import { parseShowdownTeam } from '../pokemon/showdown.parser';
 
 class GenerateTeamDto {
   @IsString()
-  @IsNotEmpty()
-  theme: string;
+  @IsOptional()
+  theme?: string;
+
+  // Multi-type selection: when non-empty, overrides `theme`.
+  // Example: ["steel", "water"] — team includes Steel OR Water type Pokémon.
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  themes?: string[];
 
   @IsString()
   @IsIn(['easy', 'medium', 'hard'])

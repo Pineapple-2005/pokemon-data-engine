@@ -7,7 +7,9 @@ import { formatShowdownTeam } from '../pokemon/showdown.parser';
 import { recommendTournamentLoadouts } from '../pokemon/battle-loadout';
 
 export interface GenerateTeamParams {
-  theme: string;
+  theme?: string;
+  /** Multi-type selection — when non-empty, overrides `theme`. */
+  themes?: string[];
   difficulty: 'easy' | 'medium' | 'hard';
   section?: string;
   group_name?: string;
@@ -31,7 +33,8 @@ export class Engine1Service {
 
   async generateTeam(params: GenerateTeamParams): Promise<Engine1Response> {
     const {
-      theme,
+      theme = 'balanced',
+      themes,
       difficulty,
       section = '3ISC',
       group_name = '',
@@ -42,6 +45,9 @@ export class Engine1Service {
       previous_lineups = [],
       variation_seed,
     } = params;
+
+    // Resolve the effective themes list — multi-type takes precedence over legacy theme
+    const effectiveThemes: string[] = (themes && themes.length > 0) ? themes : [theme];
 
     // 1. Load non-restricted Pokémon pool (excludes legendaries and mythicals).
     //    When a region is specified, filter to Pokémon native to that region.
@@ -57,7 +63,7 @@ export class Engine1Service {
         (region ? ` (region: ${region})` : ''),
     );
 
-    // 2. Call ML service — pass region through so the Python service can use it
+    // 2. Call ML service — pass themes (multi-type) and region through
     const result = await this.ml.generateGymLeaderTeam(
       theme,
       difficulty,
@@ -66,6 +72,7 @@ export class Engine1Service {
       previous_team,
       previous_lineups,
       variation_seed,
+      effectiveThemes,
     );
     result.team = await recommendTournamentLoadouts(result.team, pokemonPool);
     result.showdown_text = formatShowdownTeam(result.team, result.theme, result.difficulty);
@@ -86,7 +93,7 @@ export class Engine1Service {
         native_region_validation: nativeRegionNote,
         region,
         gym_leader: gym_leader_name,
-        type_specialization: theme,
+        type_specialization: effectiveThemes.join('/'),
         metric_used: 'silhouette_score',
         user_id: userId,
       });

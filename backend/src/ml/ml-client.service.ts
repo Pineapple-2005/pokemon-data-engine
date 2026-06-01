@@ -139,8 +139,36 @@ export class MlClientService {
   }
 
   // -------------------------------------------------------------------------
-  // Private helper — exponential-backoff retry (2 retries: 500 ms, 1 000 ms)
+  // Private helpers — retry, error extraction
   // -------------------------------------------------------------------------
+
+  /** Resolve a human-readable message from a FastAPI error detail field. */
+  private resolveErrorMessage(err: AxiosError): string {
+    const detail = (err.response?.data as Record<string, unknown> | undefined)?.detail;
+    if (typeof detail === 'string') {
+      return detail;
+    }
+    if (Array.isArray(detail)) {
+      return detail.map((entry: Record<string, unknown>) => entry['msg'] ?? JSON.stringify(entry)).join('; ');
+    }
+    return err.message;
+  }
+
+  /**
+   * When the ML service replies with a 4xx status, surface the error
+   * immediately as an HttpException (no retry — the request itself is bad).
+   */
+  private throwIfClientError(err: AxiosError): void {
+    const status = err.response?.status;
+    if (status !== undefined && status >= 400 && status < 500) {
+      throw new HttpException(
+        { success: false, error: this.resolveErrorMessage(err) },
+        status,
+      );
+    }
+  }
+
+  /** Exponential-backoff retry (2 retries: 500 ms, 1 000 ms). */
   private async withRetry<T>(
     fn: () => Promise<T>,
     retries = 2,
@@ -153,19 +181,9 @@ export class MlClientService {
         return await fn();
       } catch (err) {
         lastError = err as Error;
-        if (axios.isAxiosError(err) && err.response?.status && err.response.status >= 400 && err.response.status < 500) {
-          const detail = err.response.data?.detail;
-          const message = typeof detail === 'string'
-            ? detail
-            : Array.isArray(detail)
-              ? detail.map((entry) => entry.msg ?? JSON.stringify(entry)).join('; ')
-              : err.message;
-          throw new HttpException(
-            { success: false, error: message },
-            err.response.status,
-          );
+        if (axios.isAxiosError(err)) {
+          this.throwIfClientError(err);
         }
-
         if (attempt < retries) {
           const delay = delaysMs[attempt] ?? 1000;
           this.logger.warn(
@@ -194,6 +212,7 @@ export class MlClientService {
     previousTeam: string[] = [],
     previousLineups: string[][] = [],
     variationSeed?: number,
+    themes?: string[],
   ): Promise<Engine1Response> {
     return this.withRetry(async () => {
       const body: Record<string, unknown> = {
@@ -203,6 +222,10 @@ export class MlClientService {
         previous_team: previousTeam,
         previous_lineups: previousLineups,
       };
+      // Multi-type selection: include themes when provided (overrides theme on the Python side)
+      if (themes !== undefined && themes.length > 0) {
+        body['themes'] = themes;
+      }
       // Pass region through so the ML service can use it when available
       if (region !== undefined) {
         body['region'] = region;
