@@ -103,6 +103,8 @@ export function MobileNav() {
     setSheetOpen(false);
   }, [pathname]);
 
+  if (pathname === '/login') return null;
+
   return (
     <>
       {/* ── Bottom fixed bar ─────────────────────────────────────── */}

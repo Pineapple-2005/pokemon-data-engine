@@ -266,6 +266,7 @@ export default function LoginPage() {
       {/* ── STEP 2: Trainer Customization ─────────────────────────────────── */}
       {isRegister && step === 2 ? (
         <div
+          className="pk-login-card"
           style={{
             background: 'linear-gradient(145deg, #0d1120, #0a0e1a)',
             border: '2px solid rgba(239,68,68,0.4)',
@@ -537,6 +538,7 @@ export default function LoginPage() {
       ) : (
         /* ── STEP 1 / LOGIN form ──────────────────────────────────────────── */
         <div
+          className="pk-login-card"
           style={{
             background: 'linear-gradient(145deg, #0d1120, #0a0e1a)',
             border: '2px solid rgba(239,68,68,0.4)',
