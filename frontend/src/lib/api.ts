@@ -107,7 +107,7 @@ export const api = {
   },
 
   generateGymLeaderTeam(
-    themes: string | string[],
+    theme: string,
     difficulty: 'easy' | 'medium' | 'hard',
     region?: string,
     gymLeaderName?: string,
@@ -120,7 +120,7 @@ export const api = {
     return request<Engine1Response>('/engine1/generate', {
       method: 'POST',
       body: JSON.stringify({
-        themes: Array.isArray(themes) ? themes : [themes],
+        theme,
         difficulty,
         region,
         gym_leader_name: gymLeaderName,
