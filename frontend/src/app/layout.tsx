@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { Navbar } from '@/components/ui/Navbar';
 import { BattleTransition } from '@/components/ui/BattleTransition';
+import { MobileNav } from '@/components/ui/MobileNav';
 
 export const metadata: Metadata = {
   title: 'Pokémon Data Engine',
@@ -31,6 +32,8 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         >
           <BattleTransition>{children}</BattleTransition>
         </main>
+
+        <MobileNav />
       </body>
     </html>
   );

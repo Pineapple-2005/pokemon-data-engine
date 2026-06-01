@@ -100,15 +100,15 @@ function SectionOverview() {
 
       <Heading>◆ ARCHITECTURE</Heading>
       <Body>
-        A 3-tier data engineering platform built with real PokeAPI data covering all 151 Gen 1 Pokémon.
+        A 3-tier data engineering platform built with real PokeAPI data covering Pokémon across all 9 generations (Kanto through Paldea).
         The full stack spans Next.js on the frontend, a NestJS API gateway in the middle tier, and a
-        Python FastAPI service running the ML models — all backed by SQLite.
+        Python FastAPI service running the ML models — all backed by Supabase PostgreSQL.
       </Body>
       <InfoRow label="FRONTEND"   value="Next.js 14 (App Router) + TypeScript" />
       <InfoRow label="API GATEWAY" value="NestJS — routes requests to Python" />
       <InfoRow label="ML BACKEND" value="Python FastAPI — scikit-learn models" />
-      <InfoRow label="DATABASE"   value="SQLite — Pokémon data + battle records" />
-      <InfoRow label="POKÉMON"    value="Gen 1 · 151 Pokémon · live PokeAPI sprites" />
+      <InfoRow label="DATABASE"   value="Supabase PostgreSQL — Pokémon data + battle records" />
+      <InfoRow label="POKÉMON"    value="Gen 1–9 · 1,025 Pokémon · live PokeAPI sprites" />
 
       <SubHeading>◆ RECOMMENDED WORKFLOW</SubHeading>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem', marginTop: '0.25rem' }}>
@@ -152,7 +152,7 @@ function SectionEngine1() {
       <InfoRow label="EASY"        value="BOULDER BADGE — lower BST, basic roles" />
       <InfoRow label="MEDIUM"      value="THUNDER BADGE — balanced composition" />
       <InfoRow label="HARD"        value="VOLCANO BADGE — optimised, high BST" />
-      <InfoRow label="REGION"      value="Select the gym leader region (Kanto, Johto, Kalos, Alola)" />
+      <InfoRow label="REGION"      value="Select the gym leader region (all 9 regions: Kanto through Paldea)" />
       <InfoRow label="GYM LEADER"  value="Enter the gym leader name — used to tag the match record" />
       <InfoRow label="SECTION"     value="3ISC tag — assign this team to a Section (e.g. 3ISC-A)" />
       <InfoRow label="GROUP NAME"  value="Optional group label (e.g. GROUP 1) for team organisation" />
@@ -378,7 +378,7 @@ function SectionPokeDB() {
       <InfoRow label="NAME"   value="Text search across all 151 Pokémon" />
       <InfoRow label="TYPE"   value="Filter by primary or secondary type — tap the pill buttons" />
       <InfoRow label="ROLE"   value="Sweeper / Tank / Wall / Support / Balanced" />
-      <InfoRow label="REGION" value="Kanto / Johto / Kalos / Alola — filters by native region" />
+      <InfoRow label="REGION" value="Kanto · Johto · Hoenn · Sinnoh · Unova · Kalos · Alola · Galar · Paldea" />
 
       <SubHeading>◆ STAT COLUMNS</SubHeading>
       <PillList items={['HP', 'Attack', 'Defense', 'Sp. Atk', 'Sp. Def', 'Speed', 'BST']} />
@@ -705,7 +705,7 @@ export function GuideModal({ collapsed = false }: { readonly collapsed?: boolean
             {/* ── Modal footer ────────────────────────────── */}
             <div style={{ flexShrink: 0, padding: '0.5rem 1.25rem', borderTop: '1px solid rgba(255,255,255,0.05)', background: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'relative', zIndex: 1 }}>
               <span style={{ fontSize: '0.38rem', fontFamily: 'var(--font-pixel)', color: 'rgba(255,255,255,0.2)', letterSpacing: '0.06em' }}>
-                POKÉMON DATA ENGINE · GEN 1 · 151 POKÉMON
+                POKÉMON DATA ENGINE · GEN 1–9 · ALL REGIONS
               </span>
               <span style={{ fontSize: '0.38rem', fontFamily: 'var(--font-pixel)', color: 'rgba(255,255,255,0.2)', letterSpacing: '0.06em' }}>
                 ESC TO CLOSE

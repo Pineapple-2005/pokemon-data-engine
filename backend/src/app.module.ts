@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 
 // Feature modules
 import { DatabaseModule } from './database/database.module';
@@ -24,6 +26,12 @@ import { Engine9Module } from './engine9/engine9.module';
       envFilePath: '.env',
     }),
 
+    // Rate limiting — global: 60 req/min per IP; ml: 10 req/min for ML endpoints
+    ThrottlerModule.forRoot([
+      { name: 'global', ttl: 60_000, limit: 60 },
+      { name: 'ml',     ttl: 60_000, limit: 10 },
+    ]),
+
     // Infrastructure
     DatabaseModule,
 
@@ -42,6 +50,10 @@ import { Engine9Module } from './engine9/engine9.module';
     Engine5Module,
     Engine6Module,
     Engine9Module,
+  ],
+  providers: [
+    // Register ThrottlerGuard globally via DI so it has access to Reflector and storage
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
   ],
 })
 export class AppModule {}

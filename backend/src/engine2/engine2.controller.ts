@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { IsArray, IsString, IsOptional, ArrayNotEmpty, ArrayMaxSize, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
+import { Throttle } from '@nestjs/throttler';
 import { Engine2Service } from './engine2.service';
 import { Engine2Response } from '../ml/ml-client.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -71,6 +72,7 @@ export class Engine2Controller {
    * POST /api/engine2/counter
    * Returns a counter team for the given opponent team.
    */
+  @Throttle({ ml: { limit: 10, ttl: 60_000 } })
   @UseGuards(JwtAuthGuard)
   @Post('counter')
   @HttpCode(HttpStatus.OK)
@@ -95,6 +97,7 @@ export class Engine2Controller {
    * Fully stateless counter-team endpoint — accepts both the opponent team and the
    * counter Pokémon pool as raw stat objects. No database lookups are performed.
    */
+  @Throttle({ ml: { limit: 10, ttl: 60_000 } })
   @UseGuards(JwtAuthGuard)
   @Post('counter-from-data')
   @HttpCode(HttpStatus.OK)
