@@ -112,8 +112,9 @@ function CryButton({ slot }: { readonly slot: TeamSlot }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [playing, setPlaying] = useState(false);
   function handleCry() {
+    if (!slot.pokeapi_id) return;
     if (audioRef.current) { audioRef.current.pause(); audioRef.current.currentTime = 0; }
-    const audio = new Audio(`${CRY_BASE}/${slot.slot}.ogg`);
+    const audio = new Audio(`${CRY_BASE}/${slot.pokeapi_id}.ogg`);
     audioRef.current = audio;
     audio.addEventListener('ended', () => setPlaying(false));
     audio.addEventListener('error', () => setPlaying(false));
@@ -293,7 +294,7 @@ export default function Engine1Page() {
                   ◆ GYM LEADER REGION
                 </p>
                 <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                  {(['Kanto', 'Johto', 'Kalos', 'Alola'] as const).map((r) => {
+                  {(['Kanto', 'Johto', 'Hoenn', 'Sinnoh', 'Unova', 'Kalos', 'Alola', 'Galar', 'Paldea'] as string[]).map((r) => {
                     const active = region === r;
                     return (
                       <button

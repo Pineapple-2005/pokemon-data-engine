@@ -120,6 +120,69 @@ export interface ModelMetrics {
 }
 
 // ---------------------------------------------------------------------------
+// ML payload projection — strips columns the Python engines never read.
+// Reduces JSON body size significantly (drops ~18 def_vs_* columns plus
+// metadata columns that are irrelevant to the ML algorithms).
+// Fields kept: all stats, scaled stats, typing, region/generation/status,
+// role, assignment flag, and identifiers needed for output enrichment.
+// ---------------------------------------------------------------------------
+interface MlPokemonPayload {
+  pokemon_id: number;
+  pokeapi_id: number;
+  name: string;
+  type_1: string;
+  type_2: string | null;
+  hp: number;
+  attack: number;
+  defense: number;
+  sp_atk: number;
+  sp_def: number;
+  speed: number;
+  total_base_stats: number;
+  native_region: string;
+  generation: number;
+  restricted_status: string;
+  role_label: string;
+  is_assigned: 0 | 1;
+  hp_scaled: number | null;
+  attack_scaled: number | null;
+  defense_scaled: number | null;
+  special_attack_scaled: number | null;
+  special_defense_scaled: number | null;
+  speed_scaled: number | null;
+  total_scaled: number | null;
+}
+
+function toMlPayload(p: Pokemon): MlPokemonPayload {
+  return {
+    pokemon_id:            p.pokemon_id,
+    pokeapi_id:            p.pokeapi_id,
+    name:                  p.name,
+    type_1:                p.type_1,
+    type_2:                p.type_2,
+    hp:                    p.hp,
+    attack:                p.attack,
+    defense:               p.defense,
+    sp_atk:                p.special_attack,
+    sp_def:                p.special_defense,
+    speed:                 p.speed,
+    total_base_stats:      p.total_base_stats,
+    native_region:         p.native_region,
+    generation:            p.generation,
+    restricted_status:     p.restricted_status,
+    role_label:            p.role_label,
+    is_assigned:           p.is_assigned,
+    hp_scaled:             p.hp_scaled ?? null,
+    attack_scaled:         p.attack_scaled ?? null,
+    defense_scaled:        p.defense_scaled ?? null,
+    special_attack_scaled: p.special_attack_scaled ?? null,
+    special_defense_scaled: p.special_defense_scaled ?? null,
+    speed_scaled:          p.speed_scaled ?? null,
+    total_scaled:          p.total_scaled ?? null,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // MlClientService
 // ---------------------------------------------------------------------------
 @Injectable()
@@ -218,7 +281,7 @@ export class MlClientService {
       const body: Record<string, unknown> = {
         theme,
         difficulty,
-        pokemon_pool: pokemonPool,
+        pokemon_pool: pokemonPool.map(toMlPayload),
         previous_team: previousTeam,
         previous_lineups: previousLineups,
       };
@@ -249,8 +312,8 @@ export class MlClientService {
     return this.withRetry(async () => {
       const { data } = await this.http.post<Engine2Response>('/engine2/counter', {
         opponent_team: opponentTeam,
-        opponent_data: opponentData,
-        assigned_pool: assignedPool,
+        opponent_data: opponentData.map(toMlPayload),
+        assigned_pool: assignedPool.map(toMlPayload),
       });
       return data;
     });
@@ -269,8 +332,8 @@ export class MlClientService {
       const { data } = await this.http.post<Engine3PredictResponse>('/engine3/predict', {
         battler_a: battlerA,
         battler_b: battlerB,
-        team_a_data: teamAData,
-        team_b_data: teamBData,
+        team_a_data: teamAData.map(toMlPayload),
+        team_b_data: teamBData.map(toMlPayload),
       });
       return data;
     });

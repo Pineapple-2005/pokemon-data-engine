@@ -100,6 +100,7 @@ html, body {
   backdrop-filter: blur(16px);
   border-radius: 1rem;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  position: relative; /* required for shimmer ::before pseudo-element */
 }
 
 .pk-panel:hover {
@@ -2560,4 +2561,161 @@ html, body {
   border-radius: 0.2rem;
   padding: 0.1rem 0.3rem;
   letter-spacing: 0.04em;
+}
+
+/* ════════════════════════════════════════════════════════════
+   ENHANCEMENT PASS 3 — Mobile nav + UI theming additions
+   All new rules only — no existing rules modified
+   ════════════════════════════════════════════════════════════ */
+
+/* ── Mobile bottom nav bar ───────────────────────────────── */
+.mobile-nav-bar {
+  display: none; /* hidden on desktop */
+}
+
+/* Hide the sidebar on mobile, show the bottom bar */
+@media (max-width: 768px) {
+  .mobile-nav-bar {
+    display: flex !important;
+  }
+  /* Hide sidebar */
+  .pokedex-sidebar {
+    display: none !important;
+  }
+  /* Full width main content with bottom padding so content clears the nav bar */
+  #main-content {
+    padding-bottom: 72px;
+  }
+}
+
+/* ── Wild Pokemon encounter shimmer on .pk-panel hover ──── */
+.pk-panel:hover::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(120deg, transparent 30%, rgba(255,255,255,0.04) 50%, transparent 70%);
+  background-size: 200% 100%;
+  animation: encounter-shimmer 0.6s ease-out forwards;
+  pointer-events: none;
+  border-radius: inherit;
+  z-index: 2;
+}
+@keyframes encounter-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ── Pokémon type pill chip — game-authentic badge style ─── */
+.pk-type-badge-game {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-family: var(--font-pixel);
+  font-size: 0.38rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-weight: 900;
+  border: 1px solid rgba(0,0,0,0.3);
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+  position: relative;
+  overflow: hidden;
+}
+.pk-type-badge-game::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 50%;
+  background: rgba(255,255,255,0.12);
+  border-radius: 999px 999px 0 0;
+  pointer-events: none;
+}
+
+/* ── "Wild Pokemon appeared!" text animation ─────────────── */
+.pk-wild-appear {
+  animation: wild-appear 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+}
+@keyframes wild-appear {
+  0%   { opacity: 0; transform: scale(0.7) translateY(10px); }
+  60%  { transform: scale(1.05) translateY(-2px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* ── Pokédex scan line effect for cards ──────────────────── */
+.pk-dex-scan {
+  position: relative;
+  overflow: hidden;
+}
+.pk-dex-scan::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(0,255,100,0.3), transparent);
+  animation: dex-scan 3s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 3;
+}
+@keyframes dex-scan {
+  0%   { top: 0%; opacity: 0; }
+  5%   { opacity: 1; }
+  95%  { opacity: 1; }
+  100% { top: 100%; opacity: 0; }
+}
+
+/* ── Game-style "level up" flash for stat bars ───────────── */
+.pk-levelup-flash {
+  animation: levelup 0.4s ease-out;
+}
+@keyframes levelup {
+  0%   { filter: brightness(1); }
+  30%  { filter: brightness(2.5); }
+  60%  { filter: brightness(1.5); }
+  100% { filter: brightness(1); }
+}
+
+/* ── Pokéball spinning loader (additional variant) ───────── */
+.pk-pokeball-spin {
+  width: 24px;
+  height: 24px;
+  position: relative;
+  flex-shrink: 0;
+}
+.pk-pokeball-spin::before,
+.pk-pokeball-spin::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  inset: 0;
+}
+.pk-pokeball-spin::before {
+  border-top: 3px solid var(--pk-red);
+  border-right: 3px solid transparent;
+  border-bottom: 3px solid transparent;
+  border-left: 3px solid transparent;
+  animation: pokeball-spin 0.8s linear infinite;
+}
+.pk-pokeball-spin::after {
+  border-top: 3px solid transparent;
+  border-right: 3px solid transparent;
+  border-bottom: 3px solid rgba(239,68,68,0.3);
+  border-left: 3px solid transparent;
+  animation: pokeball-spin 0.8s linear infinite reverse;
+}
+
+/* ── Mobile: tighter section padding + readability tweaks ── */
+@media (max-width: 768px) {
+  .pk-section {
+    padding: clamp(1rem, 4vw, 1.5rem);
+  }
+  /* Better readability for pixel text on small screens */
+  .oak-dialogue-text {
+    font-size: 0.48rem;
+    line-height: 1.9;
+  }
+  /* Region buttons wrap nicely on small screens */
+  .pk-filter-bar {
+    gap: 0.5rem;
+  }
 }

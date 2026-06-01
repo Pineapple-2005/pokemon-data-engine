@@ -12,6 +12,7 @@ import {
   Request,
 } from '@nestjs/common';
 import { IsString, IsNotEmpty, IsIn, IsOptional, IsArray, IsInt } from 'class-validator';
+import { Throttle } from '@nestjs/throttler';
 import { Engine1Service } from './engine1.service';
 import { Engine1Response } from '../ml/ml-client.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -71,6 +72,7 @@ export class Engine1Controller {
    * POST /api/engine1/generate
    * Generates a gym-leader team from the Pokémon pool using the ML service.
    */
+  @Throttle({ ml: { limit: 10, ttl: 60_000 } })
   @UseGuards(JwtAuthGuard)
   @Post('generate')
   @HttpCode(HttpStatus.OK)

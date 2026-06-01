@@ -23,6 +23,14 @@ export class DatabaseService implements OnModuleInit {
   private pool: Pool;
 
   // ---------------------------------------------------------------------------
+  // In-memory TTL cache for findAllPokemon — avoids redundant full table scans
+  // on concurrent ML requests. TTL: 5 minutes. Invalidated on any write to
+  // pokemon_data (is_assigned updates) via clearPokemonCache().
+  // ---------------------------------------------------------------------------
+  private readonly pokemonCache = new Map<string, { rows: Pokemon[]; ts: number }>();
+  private readonly CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+  // ---------------------------------------------------------------------------
   // Lifecycle
   // ---------------------------------------------------------------------------
 
@@ -101,6 +109,108 @@ export class DatabaseService implements OnModuleInit {
       UPDATE pokemon_data SET restricted_status = 'mythical'
       WHERE pokeapi_id = 151 AND restricted_status = 'none'
     `);
+
+    // ── Region / generation migrations (Gen 2–9) ──
+    await this.pool.query(`
+      UPDATE pokemon_data SET native_region = 'Johto', generation = 2
+      WHERE pokeapi_id BETWEEN 152 AND 251 AND native_region = 'Kanto'
+    `);
+    await this.pool.query(`
+      UPDATE pokemon_data SET native_region = 'Hoenn', generation = 3
+      WHERE pokeapi_id BETWEEN 252 AND 386 AND native_region = 'Kanto'
+    `);
+    await this.pool.query(`
+      UPDATE pokemon_data SET native_region = 'Sinnoh', generation = 4
+      WHERE pokeapi_id BETWEEN 387 AND 493 AND native_region = 'Kanto'
+    `);
+    await this.pool.query(`
+      UPDATE pokemon_data SET native_region = 'Unova', generation = 5
+      WHERE pokeapi_id BETWEEN 494 AND 649 AND native_region = 'Kanto'
+    `);
+    await this.pool.query(`
+      UPDATE pokemon_data SET native_region = 'Kalos', generation = 6
+      WHERE pokeapi_id BETWEEN 650 AND 721 AND native_region = 'Kanto'
+    `);
+    await this.pool.query(`
+      UPDATE pokemon_data SET native_region = 'Alola', generation = 7
+      WHERE pokeapi_id BETWEEN 722 AND 809 AND native_region = 'Kanto'
+    `);
+    await this.pool.query(`
+      UPDATE pokemon_data SET native_region = 'Galar', generation = 8
+      WHERE pokeapi_id BETWEEN 810 AND 905 AND native_region = 'Kanto'
+    `);
+    await this.pool.query(`
+      UPDATE pokemon_data SET native_region = 'Paldea', generation = 9
+      WHERE pokeapi_id BETWEEN 906 AND 1025 AND native_region = 'Kanto'
+    `);
+    this.logger.log('Migration: region/generation seeds applied');
+
+    // ── Seed restricted_status for Gen 2–9 legendaries/mythicals ──
+    await this.pool.query(`
+      UPDATE pokemon_data SET restricted_status = 'legendary'
+      WHERE pokeapi_id IN (243, 244, 245, 249, 250) AND restricted_status = 'none'
+    `);
+    await this.pool.query(`
+      UPDATE pokemon_data SET restricted_status = 'mythical'
+      WHERE pokeapi_id IN (251) AND restricted_status = 'none'
+    `);
+    await this.pool.query(`
+      UPDATE pokemon_data SET restricted_status = 'legendary'
+      WHERE pokeapi_id IN (377, 378, 379, 380, 381, 382, 383, 384) AND restricted_status = 'none'
+    `);
+    await this.pool.query(`
+      UPDATE pokemon_data SET restricted_status = 'mythical'
+      WHERE pokeapi_id IN (385, 386) AND restricted_status = 'none'
+    `);
+    await this.pool.query(`
+      UPDATE pokemon_data SET restricted_status = 'legendary'
+      WHERE pokeapi_id IN (480, 481, 482, 483, 484, 485, 486, 487, 488) AND restricted_status = 'none'
+    `);
+    await this.pool.query(`
+      UPDATE pokemon_data SET restricted_status = 'mythical'
+      WHERE pokeapi_id IN (489, 490, 491, 492, 493) AND restricted_status = 'none'
+    `);
+    await this.pool.query(`
+      UPDATE pokemon_data SET restricted_status = 'legendary'
+      WHERE pokeapi_id IN (494, 638, 639, 640, 641, 642, 643, 644, 645, 646) AND restricted_status = 'none'
+    `);
+    await this.pool.query(`
+      UPDATE pokemon_data SET restricted_status = 'mythical'
+      WHERE pokeapi_id IN (647, 648, 649) AND restricted_status = 'none'
+    `);
+    await this.pool.query(`
+      UPDATE pokemon_data SET restricted_status = 'legendary'
+      WHERE pokeapi_id IN (716, 717, 718) AND restricted_status = 'none'
+    `);
+    await this.pool.query(`
+      UPDATE pokemon_data SET restricted_status = 'mythical'
+      WHERE pokeapi_id IN (719, 720, 721) AND restricted_status = 'none'
+    `);
+    await this.pool.query(`
+      UPDATE pokemon_data SET restricted_status = 'legendary'
+      WHERE pokeapi_id IN (785, 786, 787, 788, 789, 791, 792, 793, 794, 795, 796, 797, 798, 799, 800) AND restricted_status = 'none'
+    `);
+    await this.pool.query(`
+      UPDATE pokemon_data SET restricted_status = 'mythical'
+      WHERE pokeapi_id IN (801, 802) AND restricted_status = 'none'
+    `);
+    await this.pool.query(`
+      UPDATE pokemon_data SET restricted_status = 'legendary'
+      WHERE pokeapi_id IN (888, 889, 890, 894, 895, 896, 897, 898) AND restricted_status = 'none'
+    `);
+    await this.pool.query(`
+      UPDATE pokemon_data SET restricted_status = 'mythical'
+      WHERE pokeapi_id IN (891, 892, 893) AND restricted_status = 'none'
+    `);
+    await this.pool.query(`
+      UPDATE pokemon_data SET restricted_status = 'legendary'
+      WHERE pokeapi_id IN (1001, 1002, 1003, 1004, 1005, 1006, 1007, 1008, 1009, 1010) AND restricted_status = 'none'
+    `);
+    await this.pool.query(`
+      UPDATE pokemon_data SET restricted_status = 'mythical'
+      WHERE pokeapi_id IN (1011, 1012, 1013, 1014, 1015, 1016, 1017, 1018, 1019, 1020, 1021, 1022, 1023, 1024, 1025) AND restricted_status = 'none'
+    `);
+    this.logger.log('Migration: Gen 2-9 restricted_status seeds applied');
   }
 
   async createShowdownReplayTable(): Promise<void> {
@@ -134,6 +244,16 @@ export class DatabaseService implements OnModuleInit {
     native_region?: string;
     restricted_status?: string;
   }): Promise<Pokemon[]> {
+    // Cache key uniquely identifies the filter combination so different filter
+    // sets (e.g. region=Kanto vs region=Johto) get their own cache entries.
+    const cacheKey = JSON.stringify(filters ?? {});
+    const cached = this.pokemonCache.get(cacheKey);
+    const now = Date.now();
+
+    if (cached !== undefined && now - cached.ts < this.CACHE_TTL_MS) {
+      return cached.rows;
+    }
+
     let sql = 'SELECT * FROM pokemon_data WHERE 1=1';
     const params: unknown[] = [];
     let idx = 1;
@@ -163,7 +283,14 @@ export class DatabaseService implements OnModuleInit {
 
     sql += ' ORDER BY total_base_stats DESC';
 
-    return (await this.pool.query(sql, params)).rows as Pokemon[];
+    const rows = (await this.pool.query(sql, params)).rows as Pokemon[];
+    this.pokemonCache.set(cacheKey, { rows, ts: now });
+    return rows;
+  }
+
+  /** Evict all cached pokemon pool entries (call after any write to pokemon_data). */
+  clearPokemonCache(): void {
+    this.pokemonCache.clear();
   }
 
   async findPokemonByName(name: string): Promise<Pokemon | undefined> {

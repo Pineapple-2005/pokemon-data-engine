@@ -19,6 +19,7 @@ import {
   IsNumber,
   Min,
 } from 'class-validator';
+import { Throttle } from '@nestjs/throttler';
 import { Engine3Service, FlatModelMetrics, PredictResponse } from './engine3.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
@@ -98,6 +99,7 @@ export class Engine3Controller {
    * POST /api/engine3/predict
    * Pre-battle prediction — result is locked immediately.
    */
+  @Throttle({ ml: { limit: 10, ttl: 60_000 } })
   @UseGuards(JwtAuthGuard)
   @Post('predict')
   @HttpCode(HttpStatus.OK)
