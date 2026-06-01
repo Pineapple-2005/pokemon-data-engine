@@ -4,7 +4,7 @@
     "builder": "NIXPACKS"
   },
   "deploy": {
-    "startCommand": "ln -sf . ml && uvicorn api.main:app --host 0.0.0.0 --port $PORT",
+    "startCommand": "mkdir -p /opt/project && ln -sf /app /opt/project/ml && PYTHONPATH=/opt/project uvicorn api.main:app --host 0.0.0.0 --port $PORT",
     "healthcheckPath": "/health",
     "healthcheckTimeout": 100
   }
