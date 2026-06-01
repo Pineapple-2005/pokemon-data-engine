@@ -44,6 +44,9 @@ screenshots/settings.local.json
 # Playwright MCP temp files
 .playwright-mcp/
 
+# Local service logs
+.runtime/
+
 # VS Code workspace settings
 .vscode/
 
