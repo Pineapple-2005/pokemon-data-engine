@@ -46,13 +46,13 @@ class PredictDto {
 
   @IsArray()
   @ArrayNotEmpty()
-  @ArrayMaxSize(4)
+  @ArrayMaxSize(6)
   @IsString({ each: true })
   team_a: string[];
 
   @IsArray()
   @ArrayNotEmpty()
-  @ArrayMaxSize(4)
+  @ArrayMaxSize(6)
   @IsString({ each: true })
   team_b: string[];
 }
