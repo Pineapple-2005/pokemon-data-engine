@@ -44,12 +44,20 @@ function formatEvent(event: ReplayEvent): string {
 
 export default function Engine10Page() {
   const [inputId, setInputId] = useState('');
+  const [activeTab, setActiveTab] = useState<'iframe' | 'eventlog'>('iframe');
+  const [iframeReplayId, setIframeReplayId] = useState('');
   const [events, setEvents] = useState<ReplayEvent[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
 
-  async function handleLoad() {
+  function handleLoadIframe() {
+    const id = extractReplayId(inputId);
+    if (!id) return;
+    setIframeReplayId(id);
+  }
+
+  async function handleLoadEventLog() {
     const id = extractReplayId(inputId);
     if (!id) return;
     setLoading(true); setError(null); setEvents([]); setLoaded(false);
@@ -61,6 +69,14 @@ export default function Engine10Page() {
       setError(err instanceof Error ? err.message : 'Failed to load replay');
     } finally {
       setLoading(false);
+    }
+  }
+
+  function handleLoad() {
+    if (activeTab === 'iframe') {
+      handleLoadIframe();
+    } else {
+      void handleLoadEventLog();
     }
   }
 
@@ -77,6 +93,20 @@ export default function Engine10Page() {
     .filter((k) => k >= 0)
     .sort((a, b) => a - b);
   const winEvents = turnGroups.get(-1) ?? [];
+
+  const tabBtnStyle = (active: boolean): React.CSSProperties => ({
+    padding: '0.5rem 1.25rem',
+    background: active ? 'rgba(120,200,80,0.12)' : 'transparent',
+    border: 'none',
+    borderBottom: active ? '2px solid #78C850' : '2px solid transparent',
+    color: active ? '#78C850' : 'rgba(255,255,255,0.4)',
+    fontFamily: 'var(--font-pixel)',
+    fontSize: '0.5rem',
+    letterSpacing: '0.08em',
+    cursor: 'pointer',
+    transition: 'all 0.15s ease',
+    whiteSpace: 'nowrap',
+  });
 
   return (
     <AuthGuard>
@@ -97,7 +127,21 @@ export default function Engine10Page() {
           </p>
         </header>
 
-        {/* Input */}
+        {/* Tab switcher */}
+        <div style={{
+          display: 'flex', gap: 0,
+          borderBottom: '1px solid rgba(255,255,255,0.07)',
+          marginBottom: '1.25rem',
+        }}>
+          <button type="button" style={tabBtnStyle(activeTab === 'iframe')} onClick={() => setActiveTab('iframe')}>
+            IFRAME VIEW
+          </button>
+          <button type="button" style={tabBtnStyle(activeTab === 'eventlog')} onClick={() => setActiveTab('eventlog')}>
+            EVENT LOG
+          </button>
+        </div>
+
+        {/* Shared input */}
         <div style={{
           background: '#0a0e1a', border: '1px solid rgba(120,200,80,0.15)',
           borderRadius: '0.875rem', padding: '1.25rem', marginBottom: '1.25rem',
@@ -113,11 +157,11 @@ export default function Engine10Page() {
               placeholder="gen1ou-12345 or https://replay.pokemonshowdown.com/gen1ou-12345"
               className="pk-input"
               style={{ flex: '1 1 300px', fontSize: '16px' }}
-              onKeyDown={(e) => { if (e.key === 'Enter') { void handleLoad(); } }}
+              onKeyDown={(e) => { if (e.key === 'Enter') { handleLoad(); } }}
             />
             <button
               type="button"
-              onClick={() => { void handleLoad(); }}
+              onClick={handleLoad}
               disabled={!inputId.trim() || loading}
               style={{
                 padding: '0.625rem 1.5rem',
@@ -139,120 +183,154 @@ export default function Engine10Page() {
           </div>
         </div>
 
-        {error && (
-          <div role="alert" style={{
-            background: '#2a0505', border: '2px solid rgba(239,68,68,0.5)',
-            borderRadius: '0.75rem', padding: '1rem 1.25rem', marginBottom: '1.25rem',
-          }}>
-            <p style={{ margin: 0, fontSize: '0.6rem', fontFamily: 'var(--font-pixel)', color: '#EF4444' }}>REPLAY ERROR</p>
-            <p style={{ margin: '0.25rem 0 0', fontSize: '0.8rem', color: 'rgba(255,255,255,0.75)' }}>{error}</p>
+        {/* ── IFRAME VIEW tab ── */}
+        {activeTab === 'iframe' && (
+          <div>
+            {iframeReplayId ? (
+              <div>
+                <p style={{ margin: '0 0 0.5rem', fontSize: '0.42rem', fontFamily: 'var(--font-pixel)', color: 'var(--pk-text-dim)', letterSpacing: '0.06em' }}>
+                  Replay loads directly from replay.pokemonshowdown.com
+                </p>
+                <iframe
+                  src={`https://replay.pokemonshowdown.com/${iframeReplayId}`}
+                  style={{ width: '100%', height: '600px', border: 'none', borderRadius: '0.625rem' }}
+                  allowFullScreen
+                  title="Pokemon Showdown Replay"
+                />
+              </div>
+            ) : (
+              <div style={{
+                background: '#0a0e1a', border: '1px solid rgba(120,200,80,0.1)',
+                borderRadius: '0.875rem', padding: '3rem',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <p style={{ margin: 0, fontSize: '0.52rem', fontFamily: 'var(--font-pixel)', color: 'var(--pk-text-dim)', letterSpacing: '0.08em', textAlign: 'center' }}>
+                  ENTER A REPLAY ID OR URL AND CLICK LOAD REPLAY
+                </p>
+              </div>
+            )}
           </div>
         )}
 
-        {loaded && events.length === 0 && (
-          <p style={{ fontSize: '0.8rem', color: 'var(--pk-text-muted)' }}>No parseable events found in this replay.</p>
-        )}
+        {/* ── EVENT LOG tab ── */}
+        {activeTab === 'eventlog' && (
+          <div>
+            {error && (
+              <div role="alert" style={{
+                background: '#2a0505', border: '2px solid rgba(239,68,68,0.5)',
+                borderRadius: '0.75rem', padding: '1rem 1.25rem', marginBottom: '1.25rem',
+              }}>
+                <p style={{ margin: 0, fontSize: '0.6rem', fontFamily: 'var(--font-pixel)', color: '#EF4444' }}>REPLAY ERROR</p>
+                <p style={{ margin: '0.25rem 0 0', fontSize: '0.8rem', color: 'rgba(255,255,255,0.75)' }}>{error}</p>
+              </div>
+            )}
 
-        {loaded && events.length > 0 && (
-          <div style={{
-            background: '#060c12',
-            border: '1px solid rgba(120,200,80,0.2)',
-            borderRadius: '0.875rem',
-            overflow: 'hidden',
-          }}>
-            {/* Battle log header */}
-            <div style={{
-              padding: '0.625rem 1rem',
-              background: 'rgba(120,200,80,0.04)',
-              borderBottom: '1px solid rgba(120,200,80,0.15)',
-              display: 'flex', alignItems: 'center', gap: '0.5rem',
-            }}>
-              <span style={{ fontSize: '0.52rem', fontFamily: 'var(--font-pixel)', color: '#78C850', letterSpacing: '0.1em' }}>
-                BATTLE LOG
-              </span>
-              <span style={{ fontSize: '0.42rem', fontFamily: 'var(--font-pixel)', color: 'var(--pk-text-muted)', marginLeft: 'auto', letterSpacing: '0.06em' }}>
-                {turnNumbers.length} TURNS — {events.length} EVENTS
-              </span>
-            </div>
+            {loaded && events.length === 0 && (
+              <p style={{ fontSize: '0.8rem', color: 'var(--pk-text-muted)' }}>No parseable events found in this replay.</p>
+            )}
 
-            {/* Player legend */}
-            <div style={{ padding: '0.5rem 1rem', display: 'flex', gap: '1rem', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-              {(['p1','p2'] as const).map((p) => (
-                <div key={p} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: PLAYER_COLORS[p] }} />
-                  <span style={{ fontSize: '0.4rem', fontFamily: 'var(--font-pixel)', color: PLAYER_COLORS[p], letterSpacing: '0.06em' }}>
-                    {p.toUpperCase()} = PLAYER {p[1]}
+            {loaded && events.length > 0 && (
+              <div style={{
+                background: '#060c12',
+                border: '1px solid rgba(120,200,80,0.2)',
+                borderRadius: '0.875rem',
+                overflow: 'hidden',
+              }}>
+                {/* Battle log header */}
+                <div style={{
+                  padding: '0.625rem 1rem',
+                  background: 'rgba(120,200,80,0.04)',
+                  borderBottom: '1px solid rgba(120,200,80,0.15)',
+                  display: 'flex', alignItems: 'center', gap: '0.5rem',
+                }}>
+                  <span style={{ fontSize: '0.52rem', fontFamily: 'var(--font-pixel)', color: '#78C850', letterSpacing: '0.1em' }}>
+                    BATTLE LOG
+                  </span>
+                  <span style={{ fontSize: '0.42rem', fontFamily: 'var(--font-pixel)', color: 'var(--pk-text-muted)', marginLeft: 'auto', letterSpacing: '0.06em' }}>
+                    {turnNumbers.length} TURNS — {events.length} EVENTS
                   </span>
                 </div>
-              ))}
-            </div>
 
-            {/* Turn blocks */}
-            <div style={{ maxHeight: '65vh', overflowY: 'auto', padding: '0.75rem' }}>
-              {turnNumbers.map((turn) => {
-                const turnEvents = (turnGroups.get(turn) ?? []).filter((e) => e.type !== 'turn');
-                return (
-                  <div key={turn} style={{ marginBottom: '0.75rem' }}>
-                    <div style={{
-                      fontSize: '0.46rem', fontFamily: 'var(--font-pixel)',
-                      color: 'rgba(120,200,80,0.6)', letterSpacing: '0.1em',
-                      padding: '0.25rem 0.5rem',
-                      borderLeft: '2px solid rgba(120,200,80,0.25)',
-                      marginBottom: '0.3rem',
-                    }}>
-                      TURN {turn}
+                {/* Player legend */}
+                <div style={{ padding: '0.5rem 1rem', display: 'flex', gap: '1rem', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                  {(['p1','p2'] as const).map((p) => (
+                    <div key={p} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: PLAYER_COLORS[p] }} />
+                      <span style={{ fontSize: '0.4rem', fontFamily: 'var(--font-pixel)', color: PLAYER_COLORS[p], letterSpacing: '0.06em' }}>
+                        {p.toUpperCase()} = PLAYER {p[1]}
+                      </span>
                     </div>
-                    {turnEvents.map((ev, i) => {
-                      const isFaint = ev.type === 'faint';
-                      const playerColor = ev.player ? PLAYER_COLORS[ev.player] : undefined;
-                      return (
-                        <div key={i} style={{
-                          display: 'flex', alignItems: 'flex-start', gap: '0.625rem',
-                          padding: '0.3rem 0.5rem',
-                          background: isFaint ? 'rgba(239,68,68,0.06)' : 'transparent',
-                          borderRadius: '0.3rem',
-                          marginBottom: '0.15rem',
-                        }}>
-                          <span style={{ fontSize: '0.9rem', flexShrink: 0, lineHeight: 1.2 }} aria-hidden="true">
-                            {EVENT_ICONS[ev.type] ?? '·'}
-                          </span>
-                          <span style={{
-                            fontSize: '0.78rem',
-                            color: isFaint ? '#EF4444' : playerColor ?? 'var(--pk-text-muted)',
-                            fontFamily: 'monospace',
-                            lineHeight: 1.5,
-                          }}>
-                            {formatEvent(ev)}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              })}
-
-              {/* Win highlight */}
-              {winEvents.length > 0 && winEvents.map((ev, i) => (
-                <div key={`win-${i}`} style={{
-                  margin: '1rem 0 0.5rem',
-                  padding: '1rem',
-                  background: 'rgba(248,208,48,0.08)',
-                  border: '2px solid rgba(248,208,48,0.4)',
-                  borderRadius: '0.625rem',
-                  display: 'flex', alignItems: 'center', gap: '0.75rem',
-                }}>
-                  <span style={{ fontSize: '1.5rem' }} aria-hidden="true">🏆</span>
-                  <div>
-                    <p style={{ margin: 0, fontSize: '0.5rem', fontFamily: 'var(--font-pixel)', color: '#F8D030', letterSpacing: '0.1em' }}>
-                      BATTLE OVER
-                    </p>
-                    <p style={{ margin: '0.2rem 0 0', fontSize: '1rem', fontWeight: 900, color: '#F8D030' }}>
-                      {ev.detail} wins!
-                    </p>
-                  </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+
+                {/* Turn blocks */}
+                <div style={{ maxHeight: '65vh', overflowY: 'auto', padding: '0.75rem' }}>
+                  {turnNumbers.map((turn) => {
+                    const turnEvents = (turnGroups.get(turn) ?? []).filter((e) => e.type !== 'turn');
+                    return (
+                      <div key={turn} style={{ marginBottom: '0.75rem' }}>
+                        <div style={{
+                          fontSize: '0.46rem', fontFamily: 'var(--font-pixel)',
+                          color: 'rgba(120,200,80,0.6)', letterSpacing: '0.1em',
+                          padding: '0.25rem 0.5rem',
+                          borderLeft: '2px solid rgba(120,200,80,0.25)',
+                          marginBottom: '0.3rem',
+                        }}>
+                          TURN {turn}
+                        </div>
+                        {turnEvents.map((ev, i) => {
+                          const isFaint = ev.type === 'faint';
+                          const playerColor = ev.player ? PLAYER_COLORS[ev.player] : undefined;
+                          return (
+                            <div key={i} style={{
+                              display: 'flex', alignItems: 'flex-start', gap: '0.625rem',
+                              padding: '0.3rem 0.5rem',
+                              background: isFaint ? 'rgba(239,68,68,0.06)' : 'transparent',
+                              borderRadius: '0.3rem',
+                              marginBottom: '0.15rem',
+                            }}>
+                              <span style={{ fontSize: '0.9rem', flexShrink: 0, lineHeight: 1.2 }} aria-hidden="true">
+                                {EVENT_ICONS[ev.type] ?? '·'}
+                              </span>
+                              <span style={{
+                                fontSize: '0.78rem',
+                                color: isFaint ? '#EF4444' : playerColor ?? 'var(--pk-text-muted)',
+                                fontFamily: 'monospace',
+                                lineHeight: 1.5,
+                              }}>
+                                {formatEvent(ev)}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })}
+
+                  {/* Win highlight */}
+                  {winEvents.length > 0 && winEvents.map((ev, i) => (
+                    <div key={`win-${i}`} style={{
+                      margin: '1rem 0 0.5rem',
+                      padding: '1rem',
+                      background: 'rgba(248,208,48,0.08)',
+                      border: '2px solid rgba(248,208,48,0.4)',
+                      borderRadius: '0.625rem',
+                      display: 'flex', alignItems: 'center', gap: '0.75rem',
+                    }}>
+                      <span style={{ fontSize: '1.5rem' }} aria-hidden="true">🏆</span>
+                      <div>
+                        <p style={{ margin: 0, fontSize: '0.5rem', fontFamily: 'var(--font-pixel)', color: '#F8D030', letterSpacing: '0.1em' }}>
+                          BATTLE OVER
+                        </p>
+                        <p style={{ margin: '0.2rem 0 0', fontSize: '1rem', fontWeight: 900, color: '#F8D030' }}>
+                          {ev.detail} wins!
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

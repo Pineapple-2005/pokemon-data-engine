@@ -157,8 +157,7 @@ function TeamSlotWithCry({ slot }: { readonly slot: TeamSlot }) {
 
 /* ══════════════════════════════════════════════════════════════════════ */
 export default function Engine1Page() {
-  const [themes, setThemes] = useSessionState<string[]>('engine1.theme', ['Fire']);
-  const theme = themes[0] ?? 'Balanced';
+  const [theme, setTheme] = useSessionState('engine1.theme', 'Fire');
   const [difficulty, setDifficulty] = useSessionState<'easy' | 'medium' | 'hard'>('engine1.difficulty', 'medium');
   const [region, setRegion] = useSessionState('engine1.region', 'Kanto');
   const [gymLeaderName, setGymLeaderName] = useSessionState('engine1.gymLeaderName', '');
@@ -190,21 +189,12 @@ export default function Engine1Page() {
 
   const tc = TYPE_COLORS[theme] ?? TYPE_COLORS['Balanced'];
 
-  function toggleType(t: string) {
-    setThemes(prev => {
-      if (prev.includes(t)) {
-        return prev.length > 1 ? prev.filter(x => x !== t) : prev;
-      }
-      return [...prev, t];
-    });
-  }
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true); setError(null); setResult(null);
     try {
       const data = await api.generateGymLeaderTeam(
-        themes,
+        theme,
         difficulty,
         region,
         gymLeaderName,
@@ -280,15 +270,13 @@ export default function Engine1Page() {
                     GYM ARENA
                   </p>
                   <p style={{ margin: 0, fontSize: '0.75rem', fontFamily: 'var(--font-pixel)', color: tc.primary, textShadow: `0 0 12px ${tc.glow}` }}>
-                    {themes.map(t => t.toUpperCase()).join(' / ')} TYPE
+                    {theme.toUpperCase()} TYPE
                   </p>
                 </div>
               </div>
-              {/* Live type badges */}
+              {/* Live type badge */}
               <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-                {themes.filter(t => t !== 'Balanced').map(t => (
-                  <TypeBadge key={t} type={t} size="md" />
-                ))}
+                {theme !== 'Balanced' && <TypeBadge type={theme} size="md" />}
               </div>
             </div>
 
@@ -407,10 +395,10 @@ export default function Engine1Page() {
                   <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
                     <polygon points="5,0 6.2,3.5 10,3.5 7,5.8 8.1,9 5,7 1.9,9 3,5.8 0,3.5 3.8,3.5" fill="currentColor" opacity="0.7"/>
                   </svg>
-                  TYPE SPECIALITY (SELECT ONE OR MORE)
+                  TYPE SPECIALITY
                 </p>
 
-                {/* Type grid picker — multi-select */}
+                {/* Type grid picker — single select (radio-style) */}
                 <div style={{
                   display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '4px',
                   background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.07)',
@@ -418,14 +406,13 @@ export default function Engine1Page() {
                 }}>
                   {POKEMON_TYPES.map((t) => {
                     const tColor = TYPE_COLORS[t] ?? TYPE_COLORS['Balanced'];
-                    const active = themes.includes(t);
+                    const active = theme === t;
                     return (
                       <button
                         key={t}
                         type="button"
-                        onClick={() => toggleType(t)}
+                        onClick={() => setTheme(t)}
                         title={t}
-                        aria-pressed={active}
                         style={{
                           border: active ? `1px solid ${tColor.primary}` : '1px solid transparent',
                           borderRadius: '0.35rem',
@@ -436,17 +423,8 @@ export default function Engine1Page() {
                           transition: 'all 0.15s ease',
                           boxShadow: active ? `0 0 8px ${tColor.glow}` : 'none',
                           opacity: active ? 1 : 0.4,
-                          position: 'relative',
                         }}
                       >
-                        {active && (
-                          <span style={{
-                            position: 'absolute', top: '2px', right: '2px',
-                            fontSize: '0.3rem', lineHeight: 1,
-                            color: tColor.primary,
-                            textShadow: `0 0 4px ${tColor.glow}`,
-                          }} aria-hidden="true">✓</span>
-                        )}
                         <span style={{ fontSize: '0.9rem', lineHeight: 1 }}>{TYPE_SYMBOLS[t] ?? '◎'}</span>
                         <span style={{
                           fontSize: '0.32rem', fontFamily: 'var(--font-pixel)',
@@ -459,38 +437,6 @@ export default function Engine1Page() {
                     );
                   })}
                 </div>
-
-                {/* Selected types pill row — shown when more than one type is active */}
-                {themes.length > 1 && (
-                  <div style={{
-                    display: 'flex', gap: '0.4rem', flexWrap: 'wrap',
-                    marginTop: '0.5rem', alignItems: 'center',
-                  }}>
-                    <span style={{
-                      fontSize: '0.38rem', fontFamily: 'var(--font-pixel)',
-                      color: 'var(--pk-text-dim)', letterSpacing: '0.06em',
-                    }}>
-                      SELECTED:
-                    </span>
-                    {themes.map(t => {
-                      const tColor = TYPE_COLORS[t] ?? TYPE_COLORS['Balanced'];
-                      return (
-                        <span key={t} style={{
-                          fontSize: '0.38rem', fontFamily: 'var(--font-pixel)',
-                          color: tColor.primary,
-                          border: `1px solid ${tColor.primary}66`,
-                          borderRadius: '0.25rem',
-                          padding: '0.15rem 0.45rem',
-                          background: tColor.bg,
-                          letterSpacing: '0.06em',
-                          textShadow: `0 0 6px ${tColor.glow}`,
-                        }}>
-                          {t.toUpperCase()}
-                        </span>
-                      );
-                    })}
-                  </div>
-                )}
               </div>
 
               {/* ── Difficulty (gym badges) ─────────────────── */}
@@ -582,9 +528,7 @@ export default function Engine1Page() {
                 ) : (
                   <>
                     <span style={{ fontSize: '1rem' }}>
-                      {themes.length === 1
-                        ? (TYPE_SYMBOLS[theme] ?? '⚔')
-                        : themes.slice(0, 3).map(t => TYPE_SYMBOLS[t] ?? '◎').join('')}
+                      {TYPE_SYMBOLS[theme] ?? '⚔'}
                     </span>
                     <span>CHOOSE THIS TEAM</span>
                   </>
@@ -621,7 +565,7 @@ export default function Engine1Page() {
           <p style={{ margin: 0, fontSize: '0.55rem', fontFamily: 'var(--font-pixel)', color: tc.primary, letterSpacing: '0.1em', animation: 'gold-pulse 1.5s ease infinite' }}>
             CLUSTERING GYM TEAM...
           </p>
-          <p style={{ margin: '0.4rem 0 0', fontSize: '0.7rem', color: 'var(--pk-text-dim)' }}>ML engines are selecting your {themes.join(' / ')} specialists</p>
+          <p style={{ margin: '0.4rem 0 0', fontSize: '0.7rem', color: 'var(--pk-text-dim)' }}>ML engines are selecting your {theme} specialists</p>
         </div>
       )}
 

@@ -162,6 +162,9 @@ function TrainerCard({
 
   const [showLaunchTip, setShowLaunchTip] = React.useState(false);
   const [showCopyTip, setShowCopyTip] = React.useState(false);
+  const [leftTab, setLeftTab] = React.useState<'leaderboard' | 'replay'>('leaderboard');
+  const [replayInput, setReplayInput] = React.useState('');
+  const [activeReplayId, setActiveReplayId] = React.useState('');
 
   async function handleLaunchBattle() {
     try {
@@ -255,92 +258,200 @@ function TrainerCard({
       {/* Main body — two panels side by side */}
       <div style={{ display: 'flex', gap: '10px', padding: '10px', flex: 1, minHeight: '320px' }}>
 
-        {/* LEFT PANEL: Live Leaderboard */}
+        {/* LEFT PANEL: Leaderboard / Replay tabs */}
         <div style={{ flex: '1 1 0', ...dsPanel, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          {/* Panel header */}
-          <div style={dsPanelHeader}>
-            <p style={{ margin: 0, fontFamily: 'var(--font-pixel)', fontSize: '0.42rem', color: '#ffffff', letterSpacing: '0.08em' }}>
-              &#9830; BATTLE LEADERBOARD
-            </p>
-          </div>
-
-          {/* Leaderboard rows */}
-          <div style={{ flex: 1, padding: '0 5px 4px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-            {loading || leaderboard === null ? (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, minHeight: '80px' }}>
-                <p style={{ margin: 0, fontFamily: 'var(--font-pixel)', fontSize: '0.38rem', color: '#888', letterSpacing: '0.06em', textAlign: 'center' }}>
-                  LOADING...
-                </p>
-              </div>
-            ) : leaderboard.length === 0 ? (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, minHeight: '80px' }}>
-                <p style={{ margin: 0, fontFamily: 'var(--font-pixel)', fontSize: '0.38rem', color: '#888', letterSpacing: '0.06em', textAlign: 'center', lineHeight: 2 }}>
-                  NO BATTLES<br />YET
-                </p>
-              </div>
-            ) : (
-              leaderboard.slice(0, 8).map((entry, idx) => {
-                const rankColors: Record<number, string> = { 0: '#C9A227', 1: '#9EA0A6', 2: '#A0522D' };
-                const rankBg = rankColors[idx] ?? '#555';
-                const winRatePct = entry.win_rate > 1 ? entry.win_rate : entry.win_rate * 100;
-                const winRateColor = winRatePct >= 100 ? '#C9A227' : winRatePct >= 50 ? '#2e7d32' : '#CC0000';
-                const rowBg = idx % 2 === 0 ? '#f5f5f5' : '#e8f0ff';
-                return (
-                  <div key={entry.trainer} style={{
-                    display: 'flex', alignItems: 'center', gap: '4px',
-                    background: rowBg, borderRadius: '2px',
-                    padding: '2px 4px', minHeight: '20px',
-                  }}>
-                    {/* Rank badge */}
-                    <div style={{
-                      width: '14px', height: '14px', borderRadius: '50%',
-                      background: rankBg, flexShrink: 0,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    }}>
-                      <span style={{ fontFamily: 'var(--font-pixel)', fontSize: '0.3rem', color: '#fff', lineHeight: 1 }}>
-                        {entry.rank}
-                      </span>
-                    </div>
-                    {/* Trainer name */}
-                    <span style={{
-                      fontFamily: 'var(--font-body)', fontSize: '0.65rem', color: '#111',
-                      fontWeight: 600, textTransform: 'uppercase', flex: 1,
-                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                      minWidth: 0,
-                    }}>
-                      {entry.trainer}
-                    </span>
-                    {/* W/L */}
-                    <span style={{ fontFamily: 'var(--font-body)', fontSize: '0.58rem', color: '#444', whiteSpace: 'nowrap', flexShrink: 0 }}>
-                      {entry.wins}W {entry.losses}L
-                    </span>
-                    {/* Win rate */}
-                    <span style={{
-                      fontFamily: 'var(--font-body)', fontSize: '0.58rem',
-                      color: winRateColor, fontWeight: 700, whiteSpace: 'nowrap',
-                      flexShrink: 0, minWidth: '34px', textAlign: 'right',
-                    }}>
-                      {winRatePct.toFixed(0)}%
-                    </span>
-                  </div>
-                );
-              })
-            )}
-          </div>
-
-          {/* Divider + View Full link */}
-          <div style={{ borderTop: '2px solid #1a1c2e', padding: '3px 5px' }}>
-            <Link
-              href="/archive"
+          {/* Tab header */}
+          <div style={{ ...dsPanelHeader, padding: '0', display: 'flex' }}>
+            <button
+              type="button"
+              onClick={() => setLeftTab('leaderboard')}
               style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px',
-                fontFamily: 'var(--font-pixel)', fontSize: '0.35rem', color: '#4A90D9',
-                textDecoration: 'none', letterSpacing: '0.06em',
+                flex: 1,
+                background: leftTab === 'leaderboard' ? '#1a1c2e' : 'rgba(255,255,255,0.05)',
+                border: 'none',
+                borderRadius: '3px 0 0 0',
+                padding: '3px 4px',
+                fontFamily: 'var(--font-pixel)',
+                fontSize: '0.36rem',
+                color: leftTab === 'leaderboard' ? '#ffffff' : 'rgba(255,255,255,0.45)',
+                letterSpacing: '0.06em',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
               }}
             >
-              VIEW FULL &#9656;
-            </Link>
+              LEADERBOARD
+            </button>
+            <button
+              type="button"
+              onClick={() => setLeftTab('replay')}
+              style={{
+                flex: 1,
+                background: leftTab === 'replay' ? '#1a1c2e' : 'rgba(255,255,255,0.05)',
+                border: 'none',
+                borderRadius: '0 3px 0 0',
+                padding: '3px 4px',
+                fontFamily: 'var(--font-pixel)',
+                fontSize: '0.36rem',
+                color: leftTab === 'replay' ? '#ffffff' : 'rgba(255,255,255,0.45)',
+                letterSpacing: '0.06em',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              REPLAY
+            </button>
           </div>
+
+          {/* LEADERBOARD tab content */}
+          {leftTab === 'leaderboard' && (
+            <>
+              {/* Leaderboard rows */}
+              <div style={{ flex: 1, padding: '0 5px 4px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                {loading || leaderboard === null ? (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, minHeight: '80px' }}>
+                    <p style={{ margin: 0, fontFamily: 'var(--font-pixel)', fontSize: '0.38rem', color: '#888', letterSpacing: '0.06em', textAlign: 'center' }}>
+                      LOADING...
+                    </p>
+                  </div>
+                ) : leaderboard.length === 0 ? (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, minHeight: '80px' }}>
+                    <p style={{ margin: 0, fontFamily: 'var(--font-pixel)', fontSize: '0.38rem', color: '#888', letterSpacing: '0.06em', textAlign: 'center', lineHeight: 2 }}>
+                      NO BATTLES<br />YET
+                    </p>
+                  </div>
+                ) : (
+                  leaderboard.slice(0, 8).map((entry, idx) => {
+                    const rankColors: Record<number, string> = { 0: '#C9A227', 1: '#9EA0A6', 2: '#A0522D' };
+                    const rankBg = rankColors[idx] ?? '#555';
+                    const winRatePct = entry.win_rate > 1 ? entry.win_rate : entry.win_rate * 100;
+                    const winRateColor = winRatePct >= 100 ? '#C9A227' : winRatePct >= 50 ? '#2e7d32' : '#CC0000';
+                    const rowBg = idx % 2 === 0 ? '#f5f5f5' : '#e8f0ff';
+                    return (
+                      <div key={entry.trainer} style={{
+                        display: 'flex', alignItems: 'center', gap: '4px',
+                        background: rowBg, borderRadius: '2px',
+                        padding: '2px 4px', minHeight: '20px',
+                      }}>
+                        {/* Rank badge */}
+                        <div style={{
+                          width: '14px', height: '14px', borderRadius: '50%',
+                          background: rankBg, flexShrink: 0,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        }}>
+                          <span style={{ fontFamily: 'var(--font-pixel)', fontSize: '0.3rem', color: '#fff', lineHeight: 1 }}>
+                            {entry.rank}
+                          </span>
+                        </div>
+                        {/* Trainer name */}
+                        <span style={{
+                          fontFamily: 'var(--font-body)', fontSize: '0.65rem', color: '#111',
+                          fontWeight: 600, textTransform: 'uppercase', flex: 1,
+                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                          minWidth: 0,
+                        }}>
+                          {entry.trainer}
+                        </span>
+                        {/* W/L */}
+                        <span style={{ fontFamily: 'var(--font-body)', fontSize: '0.58rem', color: '#444', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                          {entry.wins}W {entry.losses}L
+                        </span>
+                        {/* Win rate */}
+                        <span style={{
+                          fontFamily: 'var(--font-body)', fontSize: '0.58rem',
+                          color: winRateColor, fontWeight: 700, whiteSpace: 'nowrap',
+                          flexShrink: 0, minWidth: '34px', textAlign: 'right',
+                        }}>
+                          {winRatePct.toFixed(0)}%
+                        </span>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* Divider + View Full link */}
+              <div style={{ borderTop: '2px solid #1a1c2e', padding: '3px 5px' }}>
+                <Link
+                  href="/archive"
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px',
+                    fontFamily: 'var(--font-pixel)', fontSize: '0.35rem', color: '#4A90D9',
+                    textDecoration: 'none', letterSpacing: '0.06em',
+                  }}
+                >
+                  VIEW FULL &#9656;
+                </Link>
+              </div>
+            </>
+          )}
+
+          {/* REPLAY tab content */}
+          {leftTab === 'replay' && (
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '5px', gap: '5px', overflow: 'hidden' }}>
+              {/* Input row */}
+              <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                <input
+                  type="text"
+                  value={replayInput}
+                  onChange={(e) => setReplayInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      const id = replayInput.match(/replay\.pokemonshowdown\.com\/([^?\s/]+)/)?.[1] ?? replayInput.trim();
+                      if (id) setActiveReplayId(id);
+                    }
+                  }}
+                  placeholder="URL or replay ID..."
+                  className="pk-input"
+                  style={{ flex: 1, fontSize: '10px', minWidth: 0 }}
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const id = replayInput.match(/replay\.pokemonshowdown\.com\/([^?\s/]+)/)?.[1] ?? replayInput.trim();
+                    if (id) setActiveReplayId(id);
+                  }}
+                  style={{
+                    background: '#1a1c2e',
+                    border: '1px solid rgba(255,255,255,0.2)',
+                    borderRadius: '3px',
+                    color: '#fff',
+                    fontFamily: 'var(--font-pixel)',
+                    fontSize: '0.32rem',
+                    letterSpacing: '0.05em',
+                    padding: '3px 6px',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0,
+                  }}
+                >
+                  &#9654; LOAD
+                </button>
+              </div>
+
+              {/* Iframe or placeholder */}
+              {activeReplayId ? (
+                <iframe
+                  src={`https://replay.pokemonshowdown.com/${activeReplayId}`}
+                  style={{ width: '100%', flex: 1, border: 'none', borderRadius: '3px', minHeight: '200px' }}
+                  allowFullScreen
+                  title="Pokemon Showdown Replay"
+                />
+              ) : (
+                <div style={{
+                  flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: 'rgba(0,0,0,0.08)', borderRadius: '3px',
+                  minHeight: '120px',
+                }}>
+                  <p style={{
+                    margin: 0, fontFamily: 'var(--font-pixel)', fontSize: '0.32rem',
+                    color: '#888', letterSpacing: '0.05em', textAlign: 'center', lineHeight: 2,
+                  }}>
+                    ENTER A REPLAY URL<br />TO WATCH
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* RIGHT PANEL: Trainer info + team + controls */}
