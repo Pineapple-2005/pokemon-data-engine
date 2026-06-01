@@ -43,6 +43,8 @@ export function Navbar() {
     router.replace('/login');
   }
 
+  if (pathname === '/login') return null;
+
   return (
     <nav
       className="pokedex-sidebar"

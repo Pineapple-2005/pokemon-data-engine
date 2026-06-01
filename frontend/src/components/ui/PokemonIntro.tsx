@@ -2,22 +2,19 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 
-// ── Pokeball SVG helper ───────────────────────────────────────────────────────
+const SPRITE_BASE = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon';
+
+// ── Pokeball SVG helper (used for falling background balls) ──────────────────
 function PokeballSVG({ size, opacity }: { size: number; opacity?: number }) {
   return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 40 40"
-      aria-hidden="true"
-      style={{ opacity: opacity ?? 1, display: 'block' }}
-    >
-      <circle cx="20" cy="20" r="18" fill="none" stroke="#333" strokeWidth="2" />
-      <path d="M2 20 A18 18 0 0 1 38 20" fill="#DC2626" />
-      <path d="M38 20 A18 18 0 0 1 2 20" fill="#F8FAFC" />
-      <line x1="2" y1="20" x2="38" y2="20" stroke="#111" strokeWidth="2.5" />
+    <svg width={size} height={size} viewBox="0 0 40 40" aria-hidden="true" style={{ opacity: opacity ?? 1, display: 'block' }}>
+      <circle cx="20" cy="20" r="19" fill="none" stroke="#333" strokeWidth="1" />
+      <path d="M1 20 A19 19 0 0 1 39 20 Z" fill="#DC2626" />
+      <path d="M1 20 A19 19 0 0 0 39 20 Z" fill="#F8FAFC" />
+      <rect x="0" y="18.5" width="40" height="3" fill="#111" />
       <circle cx="20" cy="20" r="5" fill="#111" />
-      <circle cx="20" cy="20" r="2.8" fill="#F8FAFC" />
+      <circle cx="20" cy="20" r="3" fill="#F8FAFC" />
+      <circle cx="20" cy="20" r="1.5" fill="#111" />
     </svg>
   );
 }
@@ -58,6 +55,16 @@ const FALLING_BALLS = [
   { left: '92%', delay: '1.4s',  duration: '4.4s' },
 ];
 
+// ── Background floating Pokemon sprites ───────────────────────────────────────
+const BACKGROUND_SPRITES = [
+  { id: 25,  top: '15%', duration: '8s',  delay: '0s',   direction: 'left'  },
+  { id: 133, top: '35%', duration: '11s', delay: '2s',   direction: 'right' },
+  { id: 94,  top: '55%', duration: '9s',  delay: '1.5s', direction: 'left'  },
+  { id: 143, top: '75%', duration: '13s', delay: '0.8s', direction: 'right' },
+  { id: 6,   top: '22%', duration: '10s', delay: '3s',   direction: 'right' },
+  { id: 131, top: '65%', duration: '12s', delay: '4s',   direction: 'left'  },
+] as const;
+
 const OAK_TEXT = "Hello there! Welcome to the world of Pokemon Data!";
 
 type Phase = 0 | 1 | 2 | 3 | 4;
@@ -80,9 +87,7 @@ export function PokemonIntro() {
   const [typingDone, setTypingDone] = useState(false);
   const [cursorBlink, setCursorBlink] = useState(false);
   const [skipVisible, setSkipVisible] = useState(false);
-
-  // Stroke animation state for pokeball logo
-  const [strokeDash, setStrokeDash] = useState(200);
+  const [silhouetteVisible, setSilhouetteVisible] = useState(false);
 
   const phaseRef = useRef<Phase>(0);
   const doneRef = useRef(false);
@@ -135,20 +140,11 @@ export function PokemonIntro() {
       setCreditVisible(false);
     }, 1800);
 
-    // Phase 2 — 2000ms: title sequence
+    // Phase 2 — 2000ms: title sequence (pokeball scales in)
     addTimer(() => {
       phaseRef.current = 2;
       setPhase(2);
       setLogoVisible(true);
-      // Animate stroke dash from 200 to 0 over 600ms
-      const start = performance.now();
-      function animateDash(now: number) {
-        const elapsed = now - start;
-        const progress = Math.min(elapsed / 600, 1);
-        setStrokeDash(200 * (1 - progress));
-        if (progress < 1) requestAnimationFrame(animateDash);
-      }
-      requestAnimationFrame(animateDash);
     }, 2000);
 
     // "POKEMON" slides up
@@ -157,6 +153,10 @@ export function PokemonIntro() {
     addTimer(() => setEngineTextVisible(true), 2600);
     // Dots appear
     addTimer(() => setDotsVisible(true), 2800);
+
+    // "WHO'S THAT POKEMON?" silhouette — 3200ms to 3900ms
+    addTimer(() => setSilhouetteVisible(true), 3200);
+    addTimer(() => setSilhouetteVisible(false), 3900);
 
     // Phase 3 — 4000ms: professor oak dialogue
     addTimer(() => {
@@ -206,8 +206,6 @@ export function PokemonIntro() {
     };
   }, [dialogueVisible, finish]);
 
-  // Once overlay opacity hits 0 (CSS transition), unmount by setting sessionStorage
-  // The `show` state is read-only from useState initializer — we control visibility via opacity + pointer-events
   if (!show) return null;
 
   const isGone = overlayOpacity === 0;
@@ -232,6 +230,35 @@ export function PokemonIntro() {
         .intro-dot:nth-child(3) { animation-delay: 0.6s; }
         .intro-oak-cursor {
           animation: intro-blink-dot 0.7s step-start infinite;
+        }
+        @keyframes intro-pokeball-scale-in {
+          0%   { opacity: 0; transform: scale(0.2) rotate(-180deg); }
+          60%  { transform: scale(1.08) rotate(8deg); }
+          80%  { transform: scale(0.96) rotate(-3deg); }
+          100% { opacity: 1; transform: scale(1) rotate(0deg); }
+        }
+        @keyframes intro-sprite-walk-left {
+          0%   { left: 110%; }
+          100% { left: -10%; }
+        }
+        @keyframes intro-sprite-walk-right {
+          0%   { right: 110%; left: auto; }
+          100% { right: -10%; left: auto; }
+        }
+        @keyframes intro-electric-flash {
+          0%   { opacity: 0; }
+          5%   { opacity: 0.6; }
+          10%  { opacity: 0; }
+          15%  { opacity: 0.4; }
+          20%  { opacity: 0; }
+          100% { opacity: 0; }
+        }
+        .intro-electric-overlay {
+          position: absolute;
+          inset: 0;
+          background: radial-gradient(ellipse 80% 60% at 50% 50%, rgba(248,208,48,0.15), transparent 60%);
+          animation: intro-electric-flash 0.8s ease forwards;
+          pointer-events: none;
         }
       `}</style>
 
@@ -268,6 +295,30 @@ export function PokemonIntro() {
           />
         ))}
 
+        {/* Background floating Pokemon sprites */}
+        {BACKGROUND_SPRITES.map((s) => (
+          <img
+            key={`sprite-${s.id}-${s.top}`}
+            src={`${SPRITE_BASE}/${s.id}.png`}
+            alt=""
+            loading="lazy"
+            width={32}
+            height={32}
+            aria-hidden="true"
+            style={{
+              position: 'absolute',
+              top: s.top,
+              imageRendering: 'pixelated',
+              opacity: 0.12,
+              filter: 'brightness(0) invert(1)',
+              animation: s.direction === 'left'
+                ? `intro-sprite-walk-left ${s.duration} linear infinite`
+                : `intro-sprite-walk-right ${s.duration} linear infinite`,
+              animationDelay: s.delay,
+            }}
+          />
+        ))}
+
         {/* Falling pokeballs */}
         {FALLING_BALLS.map((b) => (
           <div
@@ -300,37 +351,32 @@ export function PokemonIntro() {
             }}
           >
             <div
-              className={creditVisible ? 'intro-credit-box' : ''}
+              className={`pk-intro-credit${creditVisible ? ' intro-credit-box' : ''}`}
               style={{
                 border: '3px solid #fff',
-                width: '160px',
-                height: '60px',
+                width: '180px',
+                padding: '12px 16px',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '5px',
+                gap: '6px',
+                background: 'rgba(0,0,0,0.5)',
               }}
             >
-              {/* 3x3 pixel star */}
-              <svg width="9" height="9" viewBox="0 0 9 9" aria-hidden="true">
-                <rect x="3" y="0" width="3" height="3" fill="#fff" />
-                <rect x="0" y="3" width="3" height="3" fill="#fff" />
-                <rect x="3" y="3" width="3" height="3" fill="#fff" />
-                <rect x="6" y="3" width="3" height="3" fill="#fff" />
-                <rect x="3" y="6" width="3" height="3" fill="#fff" />
+              {/* Cross pixel star */}
+              <svg width="11" height="11" viewBox="0 0 11 11" aria-hidden="true">
+                <rect x="4" y="0" width="3" height="3" fill="#fff" />
+                <rect x="0" y="4" width="3" height="3" fill="#fff" />
+                <rect x="4" y="4" width="3" height="3" fill="#fff" />
+                <rect x="8" y="4" width="3" height="3" fill="#fff" />
+                <rect x="4" y="8" width="3" height="3" fill="#fff" />
               </svg>
-              <span
-                style={{
-                  fontFamily: "'Press Start 2P', monospace",
-                  fontSize: '0.55rem',
-                  color: '#fff',
-                  letterSpacing: '0.05em',
-                  lineHeight: 1.2,
-                  textAlign: 'center',
-                }}
-              >
+              <span style={{ fontFamily: "'Press Start 2P', monospace", fontSize: '0.55rem', color: '#fff', letterSpacing: '0.05em' }}>
                 DATA LAB
+              </span>
+              <span style={{ fontFamily: "'Press Start 2P', monospace", fontSize: '0.3rem', color: 'rgba(255,255,255,0.5)', letterSpacing: '0.04em' }}>
+                PRESENTS
               </span>
             </div>
           </div>
@@ -350,56 +396,42 @@ export function PokemonIntro() {
               gap: '0.75rem',
             }}
           >
-            {/* Pokeball logo with stroke-dashoffset draw-in */}
-            <svg
-              width="100"
-              height="100"
-              viewBox="0 0 40 40"
-              aria-hidden="true"
-              style={{ filter: 'drop-shadow(0 0 12px rgba(220,38,38,0.6))' }}
-            >
-              <circle
-                cx="20" cy="20" r="18"
-                fill="none"
-                stroke="#333"
-                strokeWidth="2"
-              />
-              {/* Top half (red) — animated draw */}
-              <path
-                d="M2 20 A18 18 0 0 1 38 20"
-                fill="none"
-                stroke="#DC2626"
-                strokeWidth="18"
-                strokeDasharray="200"
-                strokeDashoffset={strokeDash}
-                style={{ transition: 'none' }}
-              />
-              {/* Bottom half (white) — animated draw */}
-              <path
-                d="M38 20 A18 18 0 0 1 2 20"
-                fill="none"
-                stroke="#F8FAFC"
-                strokeWidth="18"
-                strokeDasharray="200"
-                strokeDashoffset={strokeDash}
-                style={{ transition: 'none' }}
-              />
-              {/* Overlaid clean halves once draw is near done */}
-              {strokeDash < 10 && (
-                <>
-                  <path d="M2 20 A18 18 0 0 1 38 20" fill="#DC2626" />
-                  <path d="M38 20 A18 18 0 0 1 2 20" fill="#F8FAFC" />
-                </>
-              )}
-              <line x1="2" y1="20" x2="38" y2="20" stroke="#111" strokeWidth="2.5" />
-              <circle cx="20" cy="20" r="5" fill="#111" />
-              <circle cx="20" cy="20" r="2.8" fill="#F8FAFC" />
-            </svg>
+            {/* Electric flash when title appears */}
+            {pokemonTextVisible && (
+              <div className="intro-electric-overlay" aria-hidden="true" />
+            )}
+
+            {/* Pokeball — proper filled halves, scales in over 600ms */}
+            <div style={{
+              width: '100px',
+              height: '100px',
+              animation: 'intro-pokeball-scale-in 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
+              filter: 'drop-shadow(0 0 16px rgba(220,38,38,0.7)) drop-shadow(0 0 32px rgba(220,38,38,0.3))',
+            }}>
+              <svg width="100" height="100" viewBox="0 0 40 40" aria-hidden="true">
+                {/* Outer ring */}
+                <circle cx="20" cy="20" r="19" fill="none" stroke="#222" strokeWidth="1" />
+                {/* Red top half */}
+                <path d="M1 20 A19 19 0 0 1 39 20 Z" fill="#DC2626" />
+                {/* White bottom half */}
+                <path d="M1 20 A19 19 0 0 0 39 20 Z" fill="#F8FAFC" />
+                {/* Black equator band */}
+                <rect x="0" y="18.5" width="40" height="3" fill="#111" />
+                {/* Center circle — outer black */}
+                <circle cx="20" cy="20" r="5.5" fill="#111" />
+                {/* Center circle — white ring */}
+                <circle cx="20" cy="20" r="3.5" fill="#F8FAFC" />
+                {/* Center circle — inner black */}
+                <circle cx="20" cy="20" r="1.8" fill="#111" />
+                {/* Shine highlight */}
+                <ellipse cx="15" cy="13" rx="3" ry="1.8" fill="rgba(255,255,255,0.22)" transform="rotate(-30 15 13)" />
+              </svg>
+            </div>
 
             {/* "POKEMON" label */}
             {pokemonTextVisible && (
               <div
-                className="intro-pokemon-text"
+                className="intro-pokemon-text pk-intro-title-pokemon"
                 style={{
                   fontFamily: "'Press Start 2P', monospace",
                   fontSize: '1.8rem',
@@ -415,7 +447,7 @@ export function PokemonIntro() {
             {/* "DATA ENGINE" label */}
             {engineTextVisible && (
               <div
-                className="intro-engine-text"
+                className="intro-engine-text pk-intro-title-engine"
                 style={{
                   fontFamily: "'Press Start 2P', monospace",
                   fontSize: '0.7rem',
@@ -449,9 +481,48 @@ export function PokemonIntro() {
           </div>
         )}
 
+        {/* ── "WHO'S THAT POKEMON?" silhouette ──────────────────────── */}
+        {phase >= 2 && silhouetteVisible && (
+          <div aria-hidden="true" style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            textAlign: 'center',
+            animation: 'intro-fade-in 0.2s ease forwards',
+          }}>
+            <p style={{
+              fontFamily: "'Press Start 2P', monospace",
+              fontSize: '0.5rem',
+              color: '#F8D030',
+              letterSpacing: '0.1em',
+              marginBottom: '0.5rem',
+              textShadow: '0 0 10px rgba(248,208,48,0.6)',
+            }}>
+              WHO&apos;S THAT POKEMON?
+            </p>
+            {/* Mewtwo silhouette */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={`${SPRITE_BASE}/150.png`}
+              alt=""
+              width={64}
+              height={64}
+              style={{
+                imageRendering: 'pixelated',
+                filter: 'brightness(0)',
+                transform: 'scale(2)',
+                display: 'block',
+                margin: '0 auto',
+              }}
+            />
+          </div>
+        )}
+
         {/* ── Phase 3: Professor Oak dialogue ───────────────────────── */}
         {phase >= 3 && dialogueVisible && (
           <div
+            className="pk-intro-dialogue"
             aria-live="polite"
             style={{
               position: 'absolute',
@@ -469,6 +540,7 @@ export function PokemonIntro() {
           >
             <div style={{ width: '100%', position: 'relative' }}>
               <p
+                className="pk-intro-oak-text"
                 style={{
                   margin: 0,
                   fontFamily: "'Press Start 2P', monospace",

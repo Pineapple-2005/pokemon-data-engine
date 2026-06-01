@@ -2862,3 +2862,33 @@ html, body {
     gap: 0.5rem;
   }
 }
+
+/* ── Login page mobile layout ────────────────────────── */
+@media (max-width: 768px) {
+  /* Login card fits mobile screen */
+  .pk-login-card {
+    padding: 1.5rem !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    border-radius: 0.75rem !important;
+  }
+
+  /* Intro overlay: scale text for small screens */
+  .pk-intro-title-pokemon {
+    font-size: clamp(1rem, 8vw, 1.8rem) !important;
+  }
+  .pk-intro-title-engine {
+    font-size: clamp(0.45rem, 3vw, 0.7rem) !important;
+  }
+  .pk-intro-oak-text {
+    font-size: clamp(0.4rem, 2.5vw, 0.52rem) !important;
+  }
+  .pk-intro-dialogue {
+    height: auto !important;
+    min-height: 100px;
+    padding: 0.75rem 1rem !important;
+  }
+  .pk-intro-credit {
+    width: 140px !important;
+  }
+}
