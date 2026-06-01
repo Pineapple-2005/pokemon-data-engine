@@ -192,7 +192,9 @@ export default function LoginPage() {
           rival_name: data.rival_name, trainer_id: data.trainer_id,
         });
       }
-      router.push('/');
+      const intended = sessionStorage.getItem('pk_intended') ?? '/';
+      sessionStorage.removeItem('pk_intended');
+      router.push(intended);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'An error occurred.';
       setError(message);
@@ -537,8 +539,17 @@ export default function LoginPage() {
         </div>
       ) : (
         /* ── STEP 1 / LOGIN form ──────────────────────────────────────────── */
+        <>
+          {/* Type badge row */}
+          <div style={{ display: 'flex', gap: '3px', marginBottom: '1rem', justifyContent: 'center', flexWrap: 'wrap', maxWidth: '360px' }}>
+            {([['#F08030','FIRE'],['#6890F0','WATER'],['#78C850','GRASS'],['#F8D030','ELECTRIC'],['#A890F0','FLYING'],['#C03028','FIGHT'],['#7038F8','DRAGON'],['#EE99AC','FAIRY']] as const).map(([color, label]) => (
+              <span key={label} style={{ fontFamily: 'var(--font-pixel)', fontSize: '0.28rem', letterSpacing: '0.04em', padding: '0.15rem 0.4rem', borderRadius: '999px', background: `${color}22`, border: `1px solid ${color}55`, color }}>
+                {label}
+              </span>
+            ))}
+          </div>
         <div
-          className="pk-login-card"
+          className="pk-login-card pk-login-card-animated"
           style={{
             background: 'linear-gradient(145deg, #0d1120, #0a0e1a)',
             border: '2px solid rgba(239,68,68,0.4)',
@@ -550,16 +561,26 @@ export default function LoginPage() {
             position: 'relative',
           }}
         >
-          {/* Pokéball SVG logo */}
-          <div className="animate-glow" style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.25rem' }}>
-            <svg width="56" height="56" viewBox="0 0 40 40" aria-hidden="true" style={{ filter: 'drop-shadow(0 0 10px rgba(239,68,68,0.45))' }}>
-              <circle cx="20" cy="20" r="18" fill="none" stroke="rgba(239,68,68,0.5)" strokeWidth="1.5" />
-              <path d="M2 20 A18 18 0 0 1 38 20" fill="#DC2626" />
-              <path d="M38 20 A18 18 0 0 1 2 20" fill="#F8FAFC" />
-              <line x1="2" y1="20" x2="38" y2="20" stroke="#111" strokeWidth="2.5" />
-              <circle cx="20" cy="20" r="5" fill="#111" />
-              <circle cx="20" cy="20" r="2.8" fill="#F8FAFC" />
-            </svg>
+          {/* Pokéball SVG logo + flanking sprites */}
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.25rem', position: 'relative' }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/6.png" alt="" loading="lazy" width={28} height={28} aria-hidden="true"
+              style={{ imageRendering: 'pixelated', position: 'absolute', left: '15%', top: '10px', filter: 'brightness(0.55) sepia(1) hue-rotate(-10deg)', opacity: 0.5, animation: 'float-up 3s ease-in-out infinite' }} />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/9.png" alt="" loading="lazy" width={28} height={28} aria-hidden="true"
+              style={{ imageRendering: 'pixelated', position: 'absolute', right: '15%', top: '10px', filter: 'brightness(0.55) sepia(1) hue-rotate(160deg)', opacity: 0.5, animation: 'float-up 3s ease-in-out 1.5s infinite' }} />
+            <div className="animate-glow">
+              <svg width="64" height="64" viewBox="0 0 40 40" aria-hidden="true" style={{ filter: 'drop-shadow(0 0 14px rgba(239,68,68,0.6))', display: 'block' }}>
+                <circle cx="20" cy="20" r="19" fill="none" stroke="rgba(239,68,68,0.3)" strokeWidth="1" />
+                <path d="M1 20 A19 19 0 0 1 39 20 Z" fill="#DC2626" />
+                <path d="M1 20 A19 19 0 0 0 39 20 Z" fill="#F8FAFC" />
+                <rect x="0" y="18.5" width="40" height="3" fill="#111" />
+                <circle cx="20" cy="20" r="5.5" fill="#111" />
+                <circle cx="20" cy="20" r="3.5" fill="#F8FAFC" />
+                <circle cx="20" cy="20" r="1.8" fill="#111" />
+                <ellipse cx="15" cy="13" rx="2.5" ry="1.5" fill="rgba(255,255,255,0.2)" transform="rotate(-30 15 13)" />
+              </svg>
+            </div>
           </div>
 
           {/* Title */}
@@ -685,6 +706,7 @@ export default function LoginPage() {
             )}
           </div>
         </div>
+        </>
       )}
 
       <style>{`

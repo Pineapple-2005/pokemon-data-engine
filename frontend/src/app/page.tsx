@@ -5,6 +5,7 @@ import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { StatCard } from '@/components/ui/StatCard';
 import { ProfessorOak } from '@/components/ui/ProfessorOak';
+import { AuthGuard } from '@/components/ui/AuthGuard';
 import { api } from '@/lib/api';
 import { getTrainerProfile, getStoredUser, clearUser } from '@/lib/auth';
 import type { PredictionWithResult, ModelMetrics, TrainerProfile } from '@/types';
@@ -558,6 +559,7 @@ function TrainerCard({
 
             {/* LAUNCH BATTLE button */}
             <button
+              type="button"
               onClick={() => { void handleLaunchBattle(); }}
               style={{
                 width: '100%',
@@ -582,6 +584,7 @@ function TrainerCard({
 
             {/* COPY TEAM button */}
             <button
+              type="button"
               onClick={() => { void handleCopyTeam(); }}
               style={{
                 width: '100%',
@@ -711,13 +714,14 @@ export default function DashboardPage() {
   }, []);
 
   return (
+    <AuthGuard>
     <div className="pk-section">
       {/* Subtle arena floor texture */}
       <div className="pk-page-arena" aria-hidden="true" />
       <div className="pk-page-glow" aria-hidden="true" />
 
       {/* ── Trainer Card hero ─────────────────────────────── */}
-      <header className="pk-dashboard-header">
+      <header className="pk-dashboard-header holo-card">
         <TrainerCard
           totalPokemon={totalPokemon}
           assignedPokemon={assignedPokemon}
@@ -772,6 +776,13 @@ export default function DashboardPage() {
         </div>
       )}
 
+      {/* ── Battle arena divider ──────────────────────── */}
+      <div aria-hidden="true" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem', marginTop: '0.5rem' }}>
+        <div style={{ flex: 1, height: '1px', background: 'linear-gradient(90deg, transparent, rgba(239,68,68,0.4))' }} />
+        <span style={{ fontFamily: 'var(--font-pixel)', fontSize: '0.42rem', color: 'var(--pk-red)', letterSpacing: '0.1em' }}>◆ BATTLE ARENA</span>
+        <div style={{ flex: 1, height: '1px', background: 'linear-gradient(90deg, rgba(239,68,68,0.4), transparent)' }} />
+      </div>
+
       {/* ── Pokédex stat panels ───────────────────────── */}
       <section aria-label="Summary statistics" style={{ marginBottom: 'clamp(1.5rem, 3vw, 2rem)' }}>
         <p className="pk-section-label">
@@ -786,15 +797,51 @@ export default function DashboardPage() {
       </section>
 
       {/* ── Recent battle log ─────────────────────────── */}
-      <section aria-label="Recent battle predictions">
+      <hr className="pk-pixel-hr" aria-hidden="true" />
+      <section aria-label="Recent battle predictions" className="pk-battle-log-section">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.875rem', flexWrap: 'wrap', gap: '0.5rem' }}>
           <p className="pk-section-label" style={{ margin: 0 }}>
             <span aria-hidden="true">◆</span> RECENT BATTLE LOG
           </p>
-          <Link href="/history" style={{ fontSize: '0.5rem', fontFamily: 'var(--font-pixel)', color: 'var(--pk-red)', textDecoration: 'none', letterSpacing: '0.06em' }}>
-            VIEW ALL ▶
-          </Link>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Link href="/history" style={{ fontSize: '0.5rem', fontFamily: 'var(--font-pixel)', color: 'var(--pk-red)', textDecoration: 'none', letterSpacing: '0.06em' }}>
+              VIEW ALL ▶
+            </Link>
+            {/* Battling sprites */}
+            <div aria-hidden="true" style={{ display: 'flex', alignItems: 'center', gap: '3px', marginLeft: '0.25rem' }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/25.png" alt="" loading="lazy" width={18} height={18} style={{ imageRendering: 'pixelated', filter: 'brightness(0.7)', animation: 'float-up 2s ease-in-out infinite' }} />
+              <span style={{ fontFamily: 'var(--font-pixel)', fontSize: '0.42rem', color: 'rgba(239,68,68,0.55)' }}>VS</span>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/150.png" alt="" loading="lazy" width={18} height={18} style={{ imageRendering: 'pixelated', filter: 'brightness(0.7)', animation: 'float-up 2s ease-in-out 1s infinite' }} />
+            </div>
+          </div>
         </div>
+        {/* Battle flavor row */}
+        {recentBattles.length > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.625rem' }}>
+            <svg aria-hidden="true" width="12" height="12" viewBox="0 0 40 40" style={{ animation: 'pokeball-spin 2s linear infinite', flexShrink: 0 }}>
+              <path d="M1 20 A19 19 0 0 1 39 20 Z" fill="#DC2626" />
+              <path d="M1 20 A19 19 0 0 0 39 20 Z" fill="#F8FAFC" />
+              <rect x="0" y="18" width="40" height="4" fill="#111" />
+              <circle cx="20" cy="20" r="5" fill="#111" />
+              <circle cx="20" cy="20" r="2.5" fill="#F8FAFC" />
+            </svg>
+            <span style={{ fontFamily: 'var(--font-pixel)', fontSize: '0.38rem', color: 'var(--pk-text-dim)', letterSpacing: '0.06em' }}>
+              {recentBattles.length} BATTLE{recentBattles.length !== 1 ? 'S' : ''} RECORDED
+            </span>
+            {metrics?.accuracy !== undefined && metrics.accuracy >= 0.7 && (
+              <span style={{ marginLeft: 'auto', fontFamily: 'var(--font-pixel)', fontSize: '0.36rem', color: '#4ADE80', letterSpacing: '0.06em', animation: 'gold-pulse 2s ease-in-out infinite' }}>
+                SUPER EFFECTIVE!
+              </span>
+            )}
+            {metrics?.accuracy !== undefined && metrics.accuracy > 0 && metrics.accuracy < 0.5 && (
+              <span style={{ marginLeft: 'auto', fontFamily: 'var(--font-pixel)', fontSize: '0.36rem', color: '#F87171', letterSpacing: '0.06em' }}>
+                NOT VERY EFFECTIVE...
+              </span>
+            )}
+          </div>
+        )}
 
         <div className="pokedex-card" style={{ overflow: 'hidden' }}>
           {loading ? (
@@ -852,5 +899,6 @@ export default function DashboardPage() {
         </div>
       </section>
     </div>
+    </AuthGuard>
   );
 }
