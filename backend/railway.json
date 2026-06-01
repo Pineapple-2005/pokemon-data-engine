@@ -4,7 +4,7 @@
     "builder": "NIXPACKS"
   },
   "deploy": {
-    "startCommand": "npm run build && node --use-system-ca dist/main.js",
+    "startCommand": "npm run build && node dist/main.js",
     "healthcheckPath": "/api/pokemon",
     "healthcheckTimeout": 100
   }
