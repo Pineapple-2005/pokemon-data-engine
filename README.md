@@ -86,7 +86,7 @@ Open [http://localhost:3000](http://localhost:3000)
 ## Engine Summaries
 
 ### Engine 01 — The Forge
-Generates a 4-Pokémon Gym Leader team using ML clustering. Pick a type specialty (Fire, Water, Psychic, etc.), difficulty (Easy/Medium/Hard), region, and gym leader name. Models: K-Means, Decision Tree, Random Forest, Cosine Similarity, Gower's Distance. Outputs team with roles, BST, silhouette score.
+Generates a 6-Pokémon Gym Leader team using ML clustering. Pick a type specialty (Fire, Water, Psychic, etc.), difficulty (Easy/Medium/Hard), region, and gym leader name. Models: K-Means, Decision Tree, Random Forest, Cosine Similarity, Gower's Distance. Outputs team with roles, BST, silhouette score.
 
 ### Engine 02 — The Counter
 Given an opponent's team, recommends the best counter team from the user's assigned Pokémon pool. Falls back to the global assigned pool if the user has no personal pool. Models: Type Advantage Score, K-NN, Decision Tree. Metric: Counter Success Rate.

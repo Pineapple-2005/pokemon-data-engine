@@ -276,8 +276,13 @@ export class DatabaseService implements OnModuleInit {
         params.push(filters.native_region);
       }
       if (filters.restricted_status !== undefined) {
-        sql += ` AND restricted_status = $${idx++}`;
-        params.push(filters.restricted_status);
+        if (filters.restricted_status === 'none') {
+          sql += ` AND (restricted_status = $${idx++} OR restricted_status IS NULL)`;
+          params.push(filters.restricted_status);
+        } else {
+          sql += ` AND restricted_status = $${idx++}`;
+          params.push(filters.restricted_status);
+        }
       }
     }
 

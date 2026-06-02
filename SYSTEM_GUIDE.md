@@ -153,7 +153,7 @@ All engine POST endpoints require a Bearer token (`Authorization: Bearer <token>
 **Route:** `/engine1` · **Auth:** Required · **ML:** K-Means clustering
 
 ### What it does
-Generates a 4-Pokémon Gym Leader team tailored to a chosen type specialty and difficulty. Uses ML clustering to find the best-fitting Pokémon for each role slot.
+Generates a 6-Pokémon Gym Leader team tailored to a chosen type specialty and difficulty. Uses ML clustering to find the best-fitting Pokémon for each role slot.
 
 ### How to use
 1. Select a **Type Specialty** (Fire, Water, Ghost, Dragon, Balanced, etc.)
@@ -163,7 +163,7 @@ Generates a 4-Pokémon Gym Leader team tailored to a chosen type specialty and d
 5. Click **CHOOSE THIS TEAM**
 
 ### Output
-- 4 Pokémon with role (Sweeper, Tank, Wall, Support, Balanced)
+- 6 Pokémon with role (Ace, Sweeper, Tank, Wall, Support, Balanced)
 - Silhouette Score (clustering quality — closer to 1.0 = better)
 - AI explanation of the team composition
 - **EXPORT FOR SHOWDOWN** → copies team in PS-importable format

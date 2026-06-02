@@ -24,7 +24,9 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       const body = exception.getResponse();
       if (typeof body === 'object' && body !== null) {
         const bodyObj = body as Record<string, unknown>;
-        message = (bodyObj['error'] as string | undefined) ?? JSON.stringify(body);
+        const msg = bodyObj['message'];
+        const err = bodyObj['error'];
+        message = Array.isArray(msg) ? msg.join(', ') : (msg as string) || (err as string) || JSON.stringify(body);
       } else {
         message = body as string;
       }
