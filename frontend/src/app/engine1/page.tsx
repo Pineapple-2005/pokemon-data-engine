@@ -160,7 +160,7 @@ function TeamSlotWithCry({ slot }: { readonly slot: TeamSlot }) {
 export default function Engine1Page() {
   const [theme, setTheme] = useSessionState('engine1.theme', 'Fire');
   const [difficulty, setDifficulty] = useSessionState<'easy' | 'medium' | 'hard'>('engine1.difficulty', 'medium');
-  const [region, setRegion] = useSessionState('engine1.region', 'Kanto');
+  const [region, setRegion] = useSessionState('engine1.region', '');
   const [gymLeaderName, setGymLeaderName] = useSessionState('engine1.gymLeaderName', '');
   const [section, setSection] = useSessionState('engine1.section', '3ISC');
   const [groupName, setGroupName] = useSessionState('engine1.groupName', '');
@@ -294,7 +294,7 @@ export default function Engine1Page() {
                   ◆ GYM LEADER REGION
                 </p>
                 <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                  {(['Kanto', 'Johto', 'Hoenn', 'Sinnoh', 'Unova', 'Kalos', 'Alola', 'Galar', 'Paldea'] as string[]).map((r) => {
+                  {(['', 'Kanto', 'Johto', 'Hoenn', 'Sinnoh', 'Unova', 'Kalos', 'Alola', 'Galar', 'Paldea'] as string[]).map((r) => {
                     const active = region === r;
                     return (
                       <button
@@ -315,7 +315,7 @@ export default function Engine1Page() {
                           boxShadow: active ? '0 0 10px rgba(184,184,208,0.35)' : 'none',
                         }}
                       >
-                        {r.toUpperCase()}
+                        {r === '' ? 'ALL REGIONS' : r.toUpperCase()}
                       </button>
                     );
                   })}
