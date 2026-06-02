@@ -1,0 +1,67 @@
+# Environment files — NEVER commit credentials
+.env
+.env.local
+.env*.local
+backend/.env
+frontend/.env.local
+ml/.env
+
+# Dependencies
+node_modules/
+backend/node_modules/
+frontend/node_modules/
+ml/.venv/
+
+# Build outputs
+backend/dist/
+frontend/.next/
+frontend/out/
+.runtime/
+*.tsbuildinfo
+
+# Database files
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+
+# ML model artifacts
+ml/models/*.pkl
+ml/data/raw/
+ml/data/logs/
+ml/data/processed/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Screenshots folder config (Playwright MCP local settings)
+screenshots/settings.local.json
+
+# Claude Code private memory
+.claude/
+
+# Playwright MCP temp files
+.playwright-mcp/
+
+# Local service logs
+.runtime/
+
+# VS Code workspace settings
+.vscode/
+
+# Dev test screenshots (root-level PNGs taken during development)
+*.png
+!screenshots/
+
+# Screenshot automation script
+screenshot-all.js
+
+# Stray files
+-w
+
+# OS
+.DS_Store
+Thumbs.db
