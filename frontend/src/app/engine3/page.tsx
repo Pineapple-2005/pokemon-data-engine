@@ -109,7 +109,7 @@ function TeamInput({
 
   function handleRandomize() {
     const shuffled = [...GEN1_POKEMON].sort(() => Math.random() - 0.5);
-    const names = shuffled.slice(0, 4).map((p) => p.name);
+    const names = shuffled.slice(0, 6).map((p) => p.name);
     onRandomize?.(names);
   }
 
@@ -137,7 +137,7 @@ function TeamInput({
     try {
       const parsed = JSON.parse(raw) as { myTeam?: string[] };
       if (Array.isArray(parsed.myTeam) && parsed.myTeam.length > 0) {
-        onImport?.(parsed.myTeam.slice(0, 4));
+        onImport?.(parsed.myTeam.slice(0, 6));
       }
     } catch { /* ignore */ }
   }
@@ -260,8 +260,8 @@ function BattleFlash({ active }: { readonly active: boolean }) {
 export default function Engine3Page() {
   const [battlerA, setBattlerA] = useSessionState('engine3.battlerA', '');
   const [battlerB, setBattlerB] = useSessionState('engine3.battlerB', '');
-  const [teamA, setTeamA] = useSessionState<string[]>('engine3.teamA', ['', '', '', '']);
-  const [teamB, setTeamB] = useSessionState<string[]>('engine3.teamB', ['', '', '', '']);
+  const [teamA, setTeamA] = useSessionState<string[]>('engine3.teamA', ['', '', '', '', '', '']);
+  const [teamB, setTeamB] = useSessionState<string[]>('engine3.teamB', ['', '', '', '', '', '']);
   const [loading, setLoading] = useState(false);
   const [prediction, setPrediction] = useSessionState<Engine3Response | null>('engine3.prediction', null);
   const [currentMatchId, setCurrentMatchId] = useSessionState('engine3.currentMatchId', '');
@@ -283,21 +283,21 @@ export default function Engine3Page() {
 
   function randomizeTeam(setter: React.Dispatch<React.SetStateAction<string[]>>) {
     const shuffled = [...GEN1_POKEMON].sort(() => Math.random() - 0.5);
-    setter(shuffled.slice(0, 4).map((p) => p.name));
+    setter(shuffled.slice(0, 6).map((p) => p.name));
   }
 
   const handleRandomizeA = useCallback((names: string[]) => { setTeamA(names); }, []);
   const handleRandomizeB = useCallback((names: string[]) => { setTeamB(names); }, []);
 
   const handleImportA = useCallback((names: string[]) => {
-    const padded = [...names.slice(0, 4)];
-    while (padded.length < 4) padded.push('');
+    const padded = [...names.slice(0, 6)];
+    while (padded.length < 6) padded.push('');
     setTeamA(padded);
   }, []);
 
   const handleImportB = useCallback((names: string[]) => {
-    const padded = [...names.slice(0, 4)];
-    while (padded.length < 4) padded.push('');
+    const padded = [...names.slice(0, 6)];
+    while (padded.length < 6) padded.push('');
     setTeamB(padded);
   }, []);
 
@@ -309,13 +309,13 @@ export default function Engine3Page() {
       const parsed = JSON.parse(raw) as { myTeam?: string[]; opponentTeam?: string[] };
       sessionStorage.removeItem('counter_team_transfer');
       if (Array.isArray(parsed.myTeam) && parsed.myTeam.length > 0) {
-        const padded = [...parsed.myTeam.slice(0, 4)];
-        while (padded.length < 4) padded.push('');
+        const padded = [...parsed.myTeam.slice(0, 6)];
+        while (padded.length < 6) padded.push('');
         setTeamA(padded);
       }
       if (Array.isArray(parsed.opponentTeam) && parsed.opponentTeam.length > 0) {
-        const padded = [...parsed.opponentTeam.slice(0, 4)];
-        while (padded.length < 4) padded.push('');
+        const padded = [...parsed.opponentTeam.slice(0, 6)];
+        while (padded.length < 6) padded.push('');
         setTeamB(padded);
       }
     } catch { /* ignore */ }
@@ -329,8 +329,8 @@ export default function Engine3Page() {
       const parsed = JSON.parse(raw) as { names?: string[]; theme?: string; difficulty?: string };
       sessionStorage.removeItem('gym_team_transfer');
       if (Array.isArray(parsed.names)) {
-        const padded: string[] = [...parsed.names.slice(0, 4)];
-        while (padded.length < 4) padded.push('');
+        const padded: string[] = [...parsed.names.slice(0, 6)];
+        while (padded.length < 6) padded.push('');
         setTeamA(padded);
       }
       const trainerName = parsed.theme ? `${parsed.theme} Gym Leader` : 'Gym Leader';

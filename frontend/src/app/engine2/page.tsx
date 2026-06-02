@@ -82,7 +82,7 @@ function PokemonSlotInput({ index, value, onChange }: { readonly index: number; 
 }
 
 export default function Engine2Page() {
-  const [opponentSlots, setOpponentSlots] = useSessionState<string[]>('engine2.opponentSlots', ['', '', '', '']);
+  const [opponentSlots, setOpponentSlots] = useSessionState<string[]>('engine2.opponentSlots', ['', '', '', '', '', '']);
   const [challengerRegion, setChallengerRegion] = useSessionState('engine2.challengerRegion', 'Johto');
   const [section, setSection] = useSessionState('engine2.section', '3ISC');
   const [groupName, setGroupName] = useSessionState('engine2.groupName', '');
@@ -97,8 +97,8 @@ export default function Engine2Page() {
   }
 
   function handleTeamImported(teamNames: string[]) {
-    const next = ['', '', '', ''];
-    teamNames.slice(0, 4).forEach((name, i) => { next[i] = name; });
+    const next = ['', '', '', '', '', ''];
+    teamNames.slice(0, 6).forEach((name, i) => { next[i] = name; });
     setOpponentSlots(next);
   }
 
