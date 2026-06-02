@@ -496,7 +496,7 @@ function TrainerCard({
             {lastTeam && lastTeam.length > 0 ? (
               <>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '2px', marginBottom: '3px' }}>
-                  {lastTeam.slice(0, 4).map((mon, i) => (
+                  {lastTeam.slice(0, 6).map((mon, i) => (
                     <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', aspectRatio: '1', background: '#e8e8e8', borderRadius: '2px', border: '1px solid #ccc' }}>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
@@ -509,7 +509,7 @@ function TrainerCard({
                       />
                     </div>
                   ))}
-                  {Array.from({ length: Math.max(0, 4 - lastTeam.length) }).map((_, i) => (
+                  {Array.from({ length: Math.max(0, 6 - lastTeam.length) }).map((_, i) => (
                     <div key={`empty-${i}`} style={{ aspectRatio: '1', background: '#ddd', borderRadius: '2px', border: '1px solid #bbb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <span style={{ fontFamily: 'var(--font-pixel)', fontSize: '0.35rem', color: '#aaa' }}>?</span>
                     </div>
