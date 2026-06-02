@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { TypeBadge } from '@/components/ui/TypeBadge';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { CounterScoreBar } from '@/components/engines/CounterScoreBar';
@@ -83,6 +83,16 @@ function PokemonSlotInput({ index, value, onChange }: { readonly index: number; 
 
 export default function Engine2Page() {
   const [opponentSlots, setOpponentSlots] = useSessionState<string[]>('engine2.opponentSlots', ['', '', '', '', '', '']);
+
+  // Normalize opponentSlots to always 6 — guards against stale sessionStorage with fewer items
+  useEffect(() => {
+    if (opponentSlots.length !== 6) {
+      const normalized = [...opponentSlots.slice(0, 6)];
+      while (normalized.length < 6) normalized.push('');
+      setOpponentSlots(normalized);
+    }
+  }, [opponentSlots, setOpponentSlots]);
+
   const [challengerRegion, setChallengerRegion] = useSessionState('engine2.challengerRegion', 'Johto');
   const [section, setSection] = useSessionState('engine2.section', '3ISC');
   const [groupName, setGroupName] = useSessionState('engine2.groupName', '');

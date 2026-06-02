@@ -262,6 +262,21 @@ export default function Engine3Page() {
   const [battlerB, setBattlerB] = useSessionState('engine3.battlerB', '');
   const [teamA, setTeamA] = useSessionState<string[]>('engine3.teamA', ['', '', '', '', '', '']);
   const [teamB, setTeamB] = useSessionState<string[]>('engine3.teamB', ['', '', '', '', '', '']);
+
+  // Normalize team slots to always 6 — guards against stale sessionStorage with fewer items
+  useEffect(() => {
+    if (teamA.length !== 6) {
+      const n = [...teamA.slice(0, 6)];
+      while (n.length < 6) n.push('');
+      setTeamA(n);
+    }
+    if (teamB.length !== 6) {
+      const n = [...teamB.slice(0, 6)];
+      while (n.length < 6) n.push('');
+      setTeamB(n);
+    }
+  }, [teamA, teamB, setTeamA, setTeamB]);
+
   const [loading, setLoading] = useState(false);
   const [prediction, setPrediction] = useSessionState<Engine3Response | null>('engine3.prediction', null);
   const [currentMatchId, setCurrentMatchId] = useSessionState('engine3.currentMatchId', '');
