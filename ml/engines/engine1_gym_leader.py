@@ -248,20 +248,22 @@ def generate_team(
     if not filtered:
         raise ValueError(f"No Pokémon available for theme '{theme_label}'")
 
-    # Guard: if the type-filtered pool itself is too small to build a full team,
-    # expand it with the best off-theme Pokémon from the full pool.
-    # This ensures narrow type+region combinations (e.g. Ghost/Paldea with only
-    # 3 entries in the DB) can still produce a 6-member team.
-    # We pad to REQUIRED_TEAM_SIZE * 3 so the downstream difficulty filter
-    # still has a realistic pool to percentile-cut from.
-    if len(filtered) < REQUIRED_TEAM_SIZE:
+    # Guard: pad the theme-filtered pool so the downstream difficulty filter and
+    # role assignment always have enough diversity to fill all 6 slots.
+    # Many region+type combos have only 1-7 Pokémon, which causes K-Means to
+    # collapse all entries into the same cluster/role — leaving other role buckets
+    # empty and producing fewer than 6 picks.
+    # TARGET_POOL_SIZE = 24 (REQUIRED_TEAM_SIZE * 4) ensures K-Means clustering
+    # has enough variety to assign all 6 roles meaningfully.
+    TARGET_POOL_SIZE = REQUIRED_TEAM_SIZE * 4  # 24 Pokémon minimum
+    if len(filtered) < TARGET_POOL_SIZE:
         filtered_names = {p.get("name") for p in filtered}
         extras_sorted = sorted(
             [p for p in pokemon_pool if p.get("name") not in filtered_names],
             key=lambda p: _safe_float(p.get("total_base_stats", p.get("total", 0))),
             reverse=True,
         )
-        need = max(REQUIRED_TEAM_SIZE, REQUIRED_TEAM_SIZE * 3) - len(filtered)
+        need = TARGET_POOL_SIZE - len(filtered)
         filtered = filtered + extras_sorted[:need]
 
     # ------------------------------------------------------------------
@@ -277,10 +279,21 @@ def generate_team(
         p for p, t in zip(filtered, totals)
         if lo_thresh <= t <= hi_thresh
     ]
-    # Fallback: if the percentile filter leaves fewer than required Pokémon (too small a pool),
-    # relax to the full filtered set so we can still build a complete team.
+    # Fallback: if the percentile filter leaves fewer than required Pokémon, first
+    # try relaxing to the full filtered set.  Then, if filtered is also too small
+    # (can happen when the overall pool is tiny), pad difficulty_filtered with the
+    # strongest extras so the role-assignment stage always has ≥ 24 candidates to
+    # draw from — preventing empty role buckets that would reduce the team to < 6.
     if len(difficulty_filtered) < REQUIRED_TEAM_SIZE:
         difficulty_filtered = filtered
+    if len(difficulty_filtered) < REQUIRED_TEAM_SIZE * 4:
+        diff_names = {p.get("name") for p in difficulty_filtered}
+        extras = sorted(
+            [p for p in filtered if p.get("name") not in diff_names],
+            key=lambda p: _safe_float(p.get("total_base_stats", p.get("total", 0))),
+            reverse=True,
+        )
+        difficulty_filtered = difficulty_filtered + extras[: REQUIRED_TEAM_SIZE * 4 - len(difficulty_filtered)]
 
     # ------------------------------------------------------------------
     # Step 3 — Build feature matrix (use scaled if available, else normalise)
@@ -507,30 +520,25 @@ def generate_team(
             selected_team.append(p_copy)
             used_names.add(p["name"])
 
-    # Ultimate fallback: fill any remaining slots from the full pokemon_pool
-    # (reached only when both the themed pool and type-filtered pool are exhausted)
-    if len(selected_team) < REQUIRED_TEAM_SIZE:
-        while len(selected_team) < REQUIRED_TEAM_SIZE:
-            ultimate_pool = [
-                p for p in pokemon_pool
-                if p.get("name") not in used_names
-            ]
-            p = _weighted_quality_pick(
-                ultimate_pool,
-                lambda candidate: _safe_float(candidate.get("total_base_stats", candidate.get("total", 300))) / 600.0,
-                rng,
-                avoid_names=previous_names,
-                quality_window=0.10,
-                max_candidates=5,
-            )
-            if p is None:
-                break
-            p_copy = dict(p)
-            p_copy["_role"] = _heuristic_role(p)
-            p_copy["_usefulness_score"] = _safe_float(p.get("total_base_stats", p.get("total", 300))) / 600.0
-            p_copy["_cos_sim"] = 0.0
-            selected_team.append(p_copy)
-            used_names.add(p["name"])
+    # Ultimate fallback: fill any remaining slots from the full pokemon_pool.
+    # Reached only when both the themed pool and type-filtered pool are exhausted.
+    # Uses max() rather than _weighted_quality_pick so that an empty quality_window
+    # cannot silently return None and stall the loop.
+    while len(selected_team) < REQUIRED_TEAM_SIZE:
+        backstop = [p for p in pokemon_pool if p.get("name") not in used_names]
+        if not backstop:
+            break
+        best = max(
+            backstop,
+            key=lambda p: _safe_float(p.get("total_base_stats", p.get("total", 0))),
+        )
+        best_copy = dict(best)
+        best_copy["_role"] = _heuristic_role(best)
+        best_copy["_usefulness_score"] = _safe_float(best.get("total_base_stats", best.get("total", 300))) / 600.0
+        best_copy["_cos_sim"] = 0.0
+        best_copy["_original_index"] = 0
+        selected_team.append(best_copy)
+        used_names.add(best["name"])
 
     # A fresh seed can occasionally choose the same four names. If viable
     # themed alternatives exist, replace the weakest non-ace slot so clicking

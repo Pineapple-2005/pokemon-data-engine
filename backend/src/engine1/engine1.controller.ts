@@ -11,7 +11,7 @@ import {
   UseGuards,
   Request,
 } from '@nestjs/common';
-import { IsString, IsNotEmpty, IsIn, IsOptional, IsArray, IsInt } from 'class-validator';
+import { IsString, IsNotEmpty, IsIn, IsOptional, IsArray, IsInt, ArrayMaxSize } from 'class-validator';
 import { Throttle } from '@nestjs/throttler';
 import { Engine1Service } from './engine1.service';
 import { Engine1Response } from '../ml/ml-client.service';
@@ -51,11 +51,13 @@ class GenerateTeamDto {
   gym_leader_name?: string;
 
   @IsArray()
+  @ArrayMaxSize(6)
   @IsString({ each: true })
   @IsOptional()
   previous_team?: string[];
 
   @IsArray()
+  @ArrayMaxSize(6)
   @IsOptional()
   previous_lineups?: string[][];
 
