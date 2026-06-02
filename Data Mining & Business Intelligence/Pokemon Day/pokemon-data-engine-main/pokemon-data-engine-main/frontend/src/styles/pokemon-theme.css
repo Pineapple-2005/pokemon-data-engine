@@ -1,0 +1,2919 @@
+/* ============================================================
+   POKEMON DATA ENGINE — Global Theme System
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Exo+2:ital,wght@0,100..900;1,100..900&display=swap');
+
+/* ── Color Tokens ───────────────────────────────────────── */
+:root {
+  /* Core palette */
+  --pk-bg:          #0a0e1a;          /* deep midnight */
+  --pk-bg-2:        #111827;          /* panel bg */
+  --pk-bg-3:        #1a2235;          /* elevated surface */
+  --pk-border:      rgba(255,255,255,0.08);
+  --pk-border-red:  rgba(239,68,68,0.4);
+
+  /* Brand colours */
+  --pk-red:         #EF4444;
+  --pk-red-dark:    #B91C1C;
+  --pk-red-glow:    rgba(239,68,68,0.35);
+  --pk-white:       #F8FAFC;
+  --pk-gold:        #F8D030;
+  --pk-gold-glow:   rgba(248,208,48,0.4);
+  --pk-electric:    #FBBF24;
+
+  /* Text */
+  --pk-text:        #E2E8F0;
+  --pk-text-muted:  #94A3B8;
+  --pk-text-dim:    #4B5563;
+
+  /* Glass / surfaces */
+  --pk-glass:       rgba(255,255,255,0.04);
+  --pk-glass-border:rgba(255,255,255,0.10);
+  --pk-glass-hover: rgba(255,255,255,0.07);
+
+  /* Exact game type colours */
+  --type-normal:    #A8A878;
+  --type-fire:      #F08030;
+  --type-water:     #6890F0;
+  --type-grass:     #78C850;
+  --type-electric:  #F8D030;
+  --type-ice:       #98D8D8;
+  --type-fighting:  #C03028;
+  --type-poison:    #A040A0;
+  --type-ground:    #E0C068;
+  --type-flying:    #A890F0;
+  --type-psychic:   #F85888;
+  --type-bug:       #A8B820;
+  --type-rock:      #B8A038;
+  --type-ghost:     #705898;
+  --type-dragon:    #7038F8;
+  --type-dark:      #705848;
+  --type-steel:     #B8B8D0;
+  --type-fairy:     #EE99AC;
+
+  /* Font stacks */
+  --font-pixel:     'Press Start 2P', monospace;
+  --font-body:      'Exo 2', system-ui, sans-serif;
+}
+
+/* ── Base Reset ─────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--pk-bg);
+  color: var(--pk-text);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Scrollbar ──────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--pk-bg-2); }
+::-webkit-scrollbar-thumb { background: var(--pk-red); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--pk-red-dark); }
+
+/* ── Focus Ring ─────────────────────────────────────────── */
+*:focus-visible {
+  outline: 2px solid var(--pk-red);
+  outline-offset: 2px;
+}
+
+/* ── Typography Utilities ───────────────────────────────── */
+.font-pixel   { font-family: var(--font-pixel); }
+.font-body    { font-family: var(--font-body); }
+
+.text-hero    { font-size: clamp(1.5rem, 4vw, 3.5rem); }
+.text-h1      { font-size: clamp(1.2rem, 2.5vw, 2rem); }
+.text-h2      { font-size: clamp(1rem, 1.8vw, 1.5rem); }
+.text-card    { font-size: clamp(0.85rem, 1.4vw, 1.05rem); }
+.text-body    { font-size: clamp(0.8rem, 1.1vw, 0.9rem); }
+.text-sm-pk   { font-size: clamp(0.7rem, 0.9vw, 0.78rem); }
+
+/* ── Glass Panel ────────────────────────────────────────── */
+.pk-panel {
+  background: var(--pk-glass);
+  border: 1px solid var(--pk-glass-border);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+  border-radius: 1rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  position: relative; /* required for shimmer ::before pseudo-element */
+}
+
+.pk-panel:hover {
+  border-color: var(--pk-border-red);
+  box-shadow: 0 0 24px var(--pk-red-glow);
+}
+
+/* ── Pokédex Card — GBA/DS screen aesthetic ─────────────── */
+.pokedex-card {
+  background: var(--pk-bg-2);
+  border: 1px solid var(--pk-glass-border);
+  border-radius: 1rem;
+  position: relative;
+  overflow: hidden;
+  /* GBA outer pixel border */
+  outline: 4px solid #0d0d1a;
+  outline-offset: 2px;
+  /* LCD phosphor glow */
+  box-shadow:
+    inset 0 0 40px rgba(0,255,120,0.012),
+    0 2px 8px rgba(0,0,0,0.6);
+}
+
+.pokedex-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--pk-red), #7038F8, var(--pk-red));
+  background-size: 200%;
+  animation: gradient-slide 3s linear infinite;
+}
+
+.pokedex-card-inner {
+  position: relative;
+  z-index: 1;
+}
+
+/* ── Legendary Holographic ──────────────────────────────── */
+.holo-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.holo-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    135deg,
+    transparent 0%,
+    rgba(248,208,48,0.05) 20%,
+    rgba(112,56,248,0.08) 40%,
+    rgba(239,68,68,0.05) 60%,
+    rgba(98,216,216,0.08) 80%,
+    transparent 100%
+  );
+  background-size: 400% 400%;
+  animation: holo-shimmer 4s ease infinite;
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+/* ── Buttons ────────────────────────────────────────────── */
+.pk-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 0.5rem;
+  padding: 0.625rem 1.25rem;
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+  outline: none;
+}
+
+.pk-btn:active { transform: scale(0.97); }
+.pk-btn:focus-visible { outline: 2px solid var(--pk-red); outline-offset: 2px; }
+
+.pk-btn-primary {
+  background: var(--pk-red);
+  color: white;
+  box-shadow: 0 4px 14px var(--pk-red-glow);
+}
+.pk-btn-primary:hover { background: var(--pk-red-dark); }
+
+.pk-btn-ghost {
+  background: var(--pk-glass);
+  color: var(--pk-text);
+  border: 1px solid var(--pk-glass-border);
+}
+.pk-btn-ghost:hover { background: var(--pk-glass-hover); border-color: var(--pk-border-red); }
+
+/* ── HP Bar ─────────────────────────────────────────────── */
+.hp-bar-wrapper {
+  position: relative;
+  border: 2px solid rgba(255,255,255,0.2);
+  border-radius: 3px;
+  overflow: hidden;
+  background: #111;
+  /* ensure the absolute fill div is contained */
+}
+.hp-bar-wrapper progress {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.hp-bar-inner {
+  height: 100%;
+  transition: width 0.8s ease-out;
+  border-radius: 2px;
+  image-rendering: pixelated;
+}
+
+.hp-bar-inner.hp-high  { background: #4CAF50; box-shadow: 0 0 6px rgba(76,175,80,0.6); }
+.hp-bar-inner.hp-mid   { background: #FFC107; box-shadow: 0 0 6px rgba(255,193,7,0.6); }
+.hp-bar-inner.hp-low   { background: #f44336; box-shadow: 0 0 6px rgba(244,67,54,0.8); }
+
+/* ── Type Badge Shimmer ─────────────────────────────────── */
+.type-badge-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+.type-badge-shimmer::after {
+  content: '';
+  position: absolute;
+  top: -50%; left: -150%;
+  width: 80%; height: 200%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+  transform: skewX(-20deg);
+  animation: badge-shine 3s ease-in-out infinite;
+}
+
+/* ── Scanlines ──────────────────────────────────────────── */
+.scanlines::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0,0,0,0.08) 2px,
+    rgba(0,0,0,0.08) 4px
+  );
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+/* ── Pixel corner decoration ────────────────────────────── */
+.pk-corners {
+  position: relative;
+}
+.pk-corners::before, .pk-corners::after {
+  content: '';
+  position: absolute;
+  width: 8px; height: 8px;
+  border-color: var(--pk-red);
+  border-style: solid;
+}
+.pk-corners::before {
+  top: 4px; left: 4px;
+  border-width: 2px 0 0 2px;
+}
+.pk-corners::after {
+  bottom: 4px; right: 4px;
+  border-width: 0 2px 2px 0;
+}
+
+/* ── Animations ─────────────────────────────────────────── */
+@keyframes gradient-slide {
+  0%   { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+
+@keyframes holo-shimmer {
+  0%   { background-position: 0% 0%; }
+  50%  { background-position: 100% 100%; }
+  100% { background-position: 0% 0%; }
+}
+
+@keyframes badge-shine {
+  0%   { left: -150%; }
+  40%  { left: 150%; }
+  100% { left: 150%; }
+}
+
+@keyframes pokeball-spin {
+  0%   { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes pokeball-open {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(1.2) rotate(30deg); }
+  100% { transform: scale(1.1); }
+}
+
+@keyframes float-up {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-8px); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 12px var(--pk-red-glow); }
+  50%       { box-shadow: 0 0 28px var(--pk-red-glow), 0 0 48px var(--pk-red-glow); }
+}
+
+@keyframes battle-flash {
+  0%   { opacity: 0; }
+  10%  { opacity: 1; }
+  20%  { opacity: 0; }
+  30%  { opacity: 0.8; }
+  40%  { opacity: 0; }
+  100% { opacity: 0; }
+}
+
+@keyframes scan-line {
+  0%   { transform: translateY(-100%); }
+  100% { transform: translateY(500%); }
+}
+
+@keyframes falling-pokeball {
+  0%   { transform: translateY(-20px) rotate(0deg); opacity: 0.15; }
+  100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+}
+
+@keyframes stat-grow {
+  from { width: 0; }
+  to   { width: var(--bar-width, 100%); }
+}
+
+@keyframes gold-pulse {
+  0%, 100% { color: var(--pk-gold); text-shadow: 0 0 8px var(--pk-gold-glow); }
+  50%       { color: #ffe57d; text-shadow: 0 0 18px var(--pk-gold-glow), 0 0 32px rgba(248,208,48,0.2); }
+}
+
+@keyframes slide-in-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pk-spin {
+  to { transform: translateY(-50%) rotate(360deg); }
+}
+
+@keyframes page-enter {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Utility classes ────────────────────────────────────── */
+.animate-float    { animation: float-up 3s ease-in-out infinite; }
+.animate-gold     { animation: gold-pulse 2s ease-in-out infinite; }
+.animate-page     { animation: page-enter 0.45s ease-out both; }
+.animate-glow     { animation: pulse-glow 2s ease-in-out infinite; }
+
+.pk-gradient-text {
+  background: linear-gradient(135deg, var(--pk-gold), var(--pk-red), #A890F0);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: var(--pk-gold); /* fallback */
+  -webkit-text-fill-color: transparent;
+}
+
+.pk-red-glow-text {
+  color: var(--pk-red);
+  text-shadow: 0 0 12px var(--pk-red-glow);
+}
+
+.pk-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--pk-border), transparent);
+  margin: 1rem 0;
+}
+
+/* ── Input overrides for dark theme ────────────────────── */
+.pk-input {
+  background: var(--pk-bg-3);
+  border: 1px solid var(--pk-glass-border);
+  color: var(--pk-text);
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  font-family: var(--font-body);
+  width: 100%;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.pk-input:focus {
+  outline: none;
+  border-color: var(--pk-red);
+  box-shadow: 0 0 0 3px var(--pk-red-glow);
+}
+.pk-input::placeholder { color: #6B7280; }
+
+/* ── Select ─────────────────────────────────────────────── */
+.pk-select {
+  appearance: none;
+  -webkit-appearance: none;
+  background: var(--pk-bg-3);
+  border: 1px solid var(--pk-glass-border);
+  color: var(--pk-text);
+  border-radius: 0.5rem;
+  padding: 0.5rem 2rem 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  font-family: var(--font-body);
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='%2394A3B8' viewBox='0 0 16 16'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.5rem center;
+  background-size: 16px;
+  transition: border-color 0.2s ease;
+}
+.pk-select:focus {
+  outline: none;
+  border-color: var(--pk-red);
+  box-shadow: 0 0 0 3px var(--pk-red-glow);
+}
+
+/* ── Table ──────────────────────────────────────────────── */
+.pk-table th {
+  background: rgba(239,68,68,0.08);
+  color: var(--pk-text-muted);
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.75rem 0.875rem;
+  border-bottom: 1px solid var(--pk-glass-border);
+  white-space: nowrap;
+}
+.pk-table td {
+  padding: 0.625rem 0.875rem;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  color: var(--pk-text);
+  font-size: 0.82rem;
+}
+.pk-table tbody tr {
+  transition: background 0.15s ease;
+}
+.pk-table tbody tr:hover {
+  background: rgba(239,68,68,0.06);
+  box-shadow: inset 3px 0 0 var(--pk-red);
+}
+.pk-table tbody tr:hover td:first-child img {
+  transform: translateY(-4px);
+  transition: transform 0.2s ease;
+}
+
+/* ── Stat mini bar ──────────────────────────────────────── */
+.pk-stat-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255,255,255,0.08);
+  overflow: hidden;
+}
+.pk-stat-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  animation: stat-grow 0.7s ease-out forwards;
+}
+
+/* ── Pokémon DB sprite row hover ────────────────────────── */
+.pokemon-sprite-row {
+  transition: transform 0.2s ease;
+}
+.pk-table tbody tr:hover .pokemon-sprite-row {
+  transform: translateY(-4px);
+}
+
+/* ── Pulse for loading skeleton ─────────────────────────── */
+@keyframes pokemon-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
+}
+
+/* ── Nav link hover ─────────────────────────────────────── */
+.nav-link-item:hover {
+  background: rgba(255,255,255,0.05) !important;
+  border-color: rgba(239,68,68,0.2) !important;
+}
+.nav-link-item:hover img {
+  filter: brightness(1) !important;
+}
+.nav-link-item:hover span {
+  color: rgba(255,255,255,0.9) !important;
+}
+.nav-collapse-btn:hover {
+  background: rgba(255,255,255,0.06) !important;
+  color: var(--pk-text) !important;
+}
+
+/* ── Pokemon card hover (CSS-only, no JS event handlers) ── */
+.pokemon-card-hover {
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+.pokemon-card-hover:hover {
+  box-shadow: 0 0 20px var(--pk-red-glow);
+  transform: translateY(-2px);
+}
+
+/* ── Sidebar item active glow ───────────────────────────── */
+/* Active state: opaque dark background so linter can verify contrast (4.8:1 vs dark) */
+.nav-item-active {
+  background: #2a0f0f;
+  border: 1px solid rgba(239,68,68,0.4);
+  color: #F8FAFC;
+  box-shadow: 0 0 16px var(--pk-red-glow);
+}
+
+/* ── Page sections ──────────────────────────────────────── */
+.pk-section {
+  padding: clamp(1.5rem, 3vw, 2.5rem);
+  max-width: 1280px;
+  margin: 0 auto;
+}
+
+/* ── Battle flash overlay ───────────────────────────────── */
+.battle-flash {
+  position: fixed;
+  inset: 0;
+  background: white;
+  z-index: 9999;
+  pointer-events: none;
+}
+
+/* ── Error banner dark ──────────────────────────────────── */
+/* Opaque dark bg so the linter can verify contrast (white text on #3b0a0a = 13:1) */
+.pk-error {
+  background: #3b0a0a;
+  border: 1px solid rgba(239,68,68,0.4);
+  color: #FFFFFF;
+  border-radius: 0.75rem;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+}
+
+/* ── GBA / DS Screen — scanline overlay on pokedex-card ─── */
+/* (base styles merged into .pokedex-card above) */
+.pokedex-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0,0,0,0.04) 0px,
+    rgba(0,0,0,0.04) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  pointer-events: none;
+  border-radius: inherit;
+  z-index: 0;
+}
+
+/* ── Battle Transition grid squares (10×8 fine grid) ────── */
+.battle-transition-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  pointer-events: none;
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  grid-template-rows: repeat(8, 1fr);
+}
+
+.battle-transition-square {
+  background: #000000;
+  transform: scale(0);
+  transform-origin: center;
+  box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
+}
+
+.battle-transition-entering .battle-transition-square {
+  animation: battle-tile-in 0.42s cubic-bezier(0.76, 0, 0.24, 1) forwards;
+}
+
+.battle-transition-exiting .battle-transition-square {
+  animation: battle-tile-out 0.42s cubic-bezier(0, 0, 0.24, 1) forwards;
+}
+
+@keyframes battle-tile-in {
+  0%   { transform: scale(0) rotate(2deg); opacity: 0; }
+  30%  { opacity: 1; }
+  60%  { transform: scale(1.06) rotate(0deg); opacity: 1; }
+  100% { transform: scale(1.02) rotate(0deg); opacity: 1; }
+}
+
+@keyframes battle-tile-out {
+  0%   { transform: scale(1.02); opacity: 1; }
+  70%  { opacity: 1; }
+  100% { transform: scale(0); opacity: 0; }
+}
+
+/* ── Global LCD Scanline overlay ────────────────────────── */
+.global-scanlines {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0,0,0,0.03) 0px,
+    rgba(0,0,0,0.03) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+}
+
+/* ── Trainer Card ────────────────────────────────────────── */
+.trainer-card {
+  max-width: 520px;
+  aspect-ratio: 1.586 / 1;
+  border-radius: 1rem;
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(
+    135deg,
+    #1a6b8a 0%,
+    #2d4a7a 25%,
+    #4a2d7a 50%,
+    #7a2d4a 75%,
+    #1a6b8a 100%
+  );
+  border: 3px solid rgba(255,255,255,0.15);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.2);
+  cursor: default;
+}
+
+.trainer-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    135deg,
+    rgba(255,255,255,0.04) 0%,
+    transparent 30%,
+    rgba(255,255,255,0.02) 50%,
+    transparent 70%,
+    rgba(255,255,255,0.06) 100%
+  );
+  pointer-events: none;
+}
+
+/* Holographic shimmer sweep on hover */
+.trainer-card-shimmer {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    125deg,
+    transparent 40%,
+    rgba(255,255,255,0.18) 50%,
+    transparent 60%
+  );
+  background-size: 200% 100%;
+  background-position: -100% 0;
+  transition: background-position 0.5s ease;
+  pointer-events: none;
+}
+
+.trainer-card:hover .trainer-card-shimmer {
+  background-position: 200% 0;
+  transition: background-position 0.5s ease;
+  animation: shimmer-sweep 0.6s ease forwards;
+}
+
+@keyframes shimmer-sweep {
+  0%   { background-position: -100% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* ── Trainer Card Avatar pixel art ──────────────────────── */
+.trainer-avatar {
+  width: 64px;
+  height: 64px;
+  background:
+    /* hat brim */
+    linear-gradient(to bottom, #e05a00 0px 8px, transparent 8px),
+    /* face */
+    radial-gradient(ellipse 22px 24px at 50% 55%, #f5c9a0 0%, #f5c9a0 100%),
+    /* body */
+    linear-gradient(to bottom, transparent 52%, #e05a00 52%);
+  border-radius: 4px;
+  position: relative;
+  image-rendering: pixelated;
+}
+
+/* ── HP Bar — GBA Accurate ──────────────────────────────── */
+.hp-bar-gba {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.hp-bar-gba-label {
+  font-family: var(--font-pixel);
+  font-size: 0.5rem;
+  color: #a8b8c8;
+  letter-spacing: 0.05em;
+}
+
+.hp-bar-gba-track {
+  height: 6px;
+  background: #1a1a2e;
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+.hp-bar-gba-fill {
+  height: 100%;
+  border-radius: 0;
+  transition: width 0.8s ease-out;
+  image-rendering: pixelated;
+}
+
+.hp-bar-gba-fill.hp-gba-high  { background: #58C84A; box-shadow: 0 0 4px rgba(88,200,74,0.8); }
+.hp-bar-gba-fill.hp-gba-mid   { background: #E0C030; box-shadow: 0 0 4px rgba(224,192,48,0.8); }
+.hp-bar-gba-fill.hp-gba-low   { background: #E82828; box-shadow: 0 0 4px rgba(232,40,40,0.8); animation: hp-flicker 0.5s ease-in-out infinite; }
+
+@keyframes hp-flicker {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.65; }
+}
+
+/* ── Battle Screen Layout ────────────────────────────────── */
+.battle-screen {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 1rem;
+  align-items: start;
+}
+
+.battle-side-player {
+  border-radius: 1rem;
+  padding: clamp(1rem, 2.5vw, 1.5rem);
+  background: linear-gradient(135deg, rgba(220,38,38,0.12), var(--pk-glass));
+  border: 2px solid rgba(239,68,68,0.35);
+  position: relative;
+}
+
+.battle-side-player::before {
+  content: '';
+  position: absolute;
+  bottom: -8px; left: 10%; right: 10%;
+  height: 16px;
+  background: radial-gradient(ellipse, rgba(239,68,68,0.3) 0%, transparent 70%);
+  filter: blur(4px);
+}
+
+.battle-side-opponent {
+  border-radius: 1rem;
+  padding: clamp(1rem, 2.5vw, 1.5rem);
+  background: linear-gradient(135deg, rgba(104,144,240,0.12), var(--pk-glass));
+  border: 2px solid rgba(104,144,240,0.35);
+  position: relative;
+}
+
+.battle-side-opponent::before {
+  content: '';
+  position: absolute;
+  bottom: -8px; left: 10%; right: 10%;
+  height: 16px;
+  background: radial-gradient(ellipse, rgba(104,144,240,0.3) 0%, transparent 70%);
+  filter: blur(4px);
+}
+
+.battle-vs-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #DC2626, #7B0000);
+  color: #fff;
+  font-family: var(--font-pixel);
+  font-size: 0.7rem;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  box-shadow: 0 0 20px rgba(220,38,38,0.6), 0 0 40px rgba(220,38,38,0.3);
+  animation: vs-pulse 1.5s ease-in-out infinite;
+  flex-shrink: 0;
+  align-self: center;
+}
+
+@keyframes vs-pulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 20px rgba(220,38,38,0.6); }
+  50%       { transform: scale(1.08); box-shadow: 0 0 30px rgba(220,38,38,0.9), 0 0 60px rgba(220,38,38,0.4); }
+}
+
+/* Winner stamp */
+.winner-stamp {
+  font-family: var(--font-pixel);
+  font-size: clamp(0.8rem, 2vw, 1.2rem);
+  color: var(--pk-gold);
+  text-shadow: 0 0 12px var(--pk-gold-glow), 0 0 24px var(--pk-gold-glow);
+  letter-spacing: 0.08em;
+  text-align: center;
+  padding: 0.25rem 0;
+  animation: winner-glow 1.5s ease-in-out infinite;
+}
+
+@keyframes winner-glow {
+  0%, 100% { text-shadow: 0 0 12px var(--pk-gold-glow); }
+  50%       { text-shadow: 0 0 24px var(--pk-gold-glow), 0 0 40px rgba(248,208,48,0.4); }
+}
+
+/* Battle reveal flash */
+.battle-reveal-flash {
+  animation: battle-reveal 0.6s ease-out;
+}
+
+@keyframes battle-reveal {
+  0%   { opacity: 0; background: rgba(255,255,255,0.9); }
+  15%  { opacity: 1; background: rgba(255,255,255,0.8); }
+  30%  { background: rgba(255,255,255,0); }
+  45%  { background: rgba(255,255,255,0.4); }
+  60%  { background: rgba(255,255,255,0); }
+  100% { opacity: 1; background: transparent; }
+}
+
+/* ── Pokédex Entry (slide-up popup) ─────────────────────── */
+.pokedex-entry-popup {
+  overflow: hidden;
+  background: var(--pk-bg-2);
+  border-top: 1px solid var(--pk-glass-border);
+}
+
+.pokedex-entry-popup.open {
+  animation: slide-down 0.25s ease-out forwards;
+}
+
+@keyframes slide-down {
+  from { opacity: 0; max-height: 0; }
+  to   { opacity: 1; max-height: 300px; }
+}
+
+/* ── Pokédex Sidebar frame ───────────────────────────────── */
+.pokedex-sidebar {
+  border-right: 3px solid #B71C1C;
+  box-shadow: inset -1px 0 0 #7B0000, 2px 0 8px rgba(0,0,0,0.5);
+}
+
+.nav-entry-number {
+  font-family: var(--font-pixel);
+  font-size: 0.42rem;
+  color: #7a1a1a;
+  min-width: 1.8rem;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.nav-entry-cursor {
+  color: var(--pk-blue, #6890F0);
+  font-size: 0.75rem;
+  flex-shrink: 0;
+  animation: cursor-blink 0.8s step-end infinite;
+}
+
+@keyframes cursor-blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+
+/* ── Matchup table cell glows ────────────────────────────── */
+.matchup-cell-2x {
+  background: rgba(78,200,78,0.2) !important;
+  box-shadow: inset 0 0 8px rgba(78,200,78,0.4) !important;
+  animation: matchup-pulse 2s ease-in-out infinite;
+}
+
+.matchup-cell-half {
+  background: rgba(239,68,68,0.2) !important;
+  box-shadow: inset 0 0 6px rgba(239,68,68,0.3) !important;
+}
+
+.matchup-cell-immune {
+  background: rgba(80,80,80,0.25) !important;
+  color: var(--pk-text-dim) !important;
+}
+
+@keyframes matchup-pulse {
+  0%, 100% { transform: scale(1); }
+  50%       { transform: scale(1.03); }
+}
+
+/* ── Professor Oak dialogue box — Gen 1/2 pixel-game style ── */
+
+/* The dialogue box sits to the RIGHT of the portrait container */
+.oak-dialogue {
+  position: relative;
+  background: #1a1a2e;
+  border: 2px solid #ffffff;
+  border-left: none;
+  border-radius: 0;                   /* sharp corners — pixel-game style */
+  padding: 0.875rem 1.25rem 1.25rem 1rem;
+  min-width: 220px;
+  max-width: 380px;
+  min-height: 108px;
+  display: flex;
+  align-items: flex-start;
+}
+
+/* Bottom-right ▼ cursor shown when typing is done — bold white */
+.oak-dialogue-cursor-done {
+  display: inline-block;
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin-left: 4px;
+  animation: cursor-blink 0.7s step-end infinite;
+  vertical-align: middle;
+  line-height: 1;
+}
+
+.oak-dialogue-text {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.55rem;
+  color: #ffffff;
+  line-height: 2;
+  letter-spacing: 0.04em;
+  margin: 0;
+  /* align top */
+  align-self: flex-start;
+}
+
+/* Blinking underscore cursor while text is still typing */
+.oak-dialogue-cursor {
+  display: inline-block;
+  width: 6px;
+  height: 1px;
+  background: #ffffff;
+  margin-left: 3px;
+  animation: cursor-blink 0.5s step-end infinite;
+  vertical-align: middle;
+  position: relative;
+  top: -1px;
+}
+
+/* ── Cursor trail ────────────────────────────────────────── */
+.cursor-trail-dot {
+  position: fixed;
+  pointer-events: none;
+  z-index: 10000;
+  width: 12px;
+  height: 12px;
+  animation: trail-fade 0.8s ease-out forwards;
+}
+
+@keyframes trail-fade {
+  0%   { opacity: 0.8; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.3); }
+}
+
+/* ── Pokémon cry button ──────────────────────────────────── */
+.cry-btn {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 0.375rem;
+  padding: 0.2rem 0.4rem;
+  cursor: pointer;
+  font-size: 0.7rem;
+  color: var(--pk-text-muted);
+  transition: background 0.15s ease, color 0.15s ease;
+  flex-shrink: 0;
+}
+.cry-btn:hover {
+  background: rgba(248,208,48,0.15);
+  color: var(--pk-gold);
+  border-color: rgba(248,208,48,0.3);
+}
+.cry-btn:focus-visible {
+  outline: 2px solid var(--pk-gold);
+  outline-offset: 2px;
+}
+
+/* ── Reduced motion ─────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════
+   ENHANCEMENT PASS — Pokémon game immersion (6 pages)
+   Added below existing rules — no existing rules modified
+   ════════════════════════════════════════════════════════════ */
+
+/* ── Arena background shared (reusable across pages) ────── */
+.pk-arena-bg {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* ── Page section tag (ENGINE 1, POKÉDEX, etc.) ─────────── */
+.pk-page-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+/* ── Section label — pixel ◆ prefix style ────────────────── */
+.pk-section-label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: var(--font-pixel);
+  font-size: 0.52rem;
+  color: var(--pk-text-muted);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 0.75rem;
+}
+
+.pk-section-label.accent-red   { color: var(--pk-red); }
+.pk-section-label.accent-gold  { color: var(--pk-gold); }
+
+/* ── Game-menu action button (full-width) ───────────────── */
+.pk-menu-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  width: 100%;
+  border-radius: 0.5rem;
+  padding: 0.7rem 1rem;
+  font-family: var(--font-pixel);
+  font-size: 0.5rem;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  text-decoration: none;
+  border: 2px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.04);
+  color: var(--pk-text);
+  text-transform: uppercase;
+  position: relative;
+  overflow: hidden;
+}
+
+.pk-menu-btn::before {
+  content: '▶';
+  font-size: 0.4rem;
+  color: var(--pk-red);
+  opacity: 0;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  transform: translateX(-4px);
+  flex-shrink: 0;
+}
+
+.pk-menu-btn:hover::before,
+.pk-menu-btn:focus-visible::before {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.pk-menu-btn.pk-menu-primary {
+  background: linear-gradient(135deg, rgba(239,68,68,0.18), rgba(239,68,68,0.08));
+  border-color: rgba(239,68,68,0.4);
+  color: var(--pk-text);
+}
+.pk-menu-btn.pk-menu-primary:hover {
+  background: linear-gradient(135deg, rgba(239,68,68,0.28), rgba(239,68,68,0.14));
+  border-color: rgba(239,68,68,0.7);
+  box-shadow: 0 0 16px rgba(239,68,68,0.25);
+}
+
+.pk-menu-btn.pk-menu-blue {
+  background: linear-gradient(135deg, rgba(104,144,240,0.15), rgba(104,144,240,0.06));
+  border-color: rgba(104,144,240,0.35);
+  color: var(--pk-text);
+}
+.pk-menu-btn.pk-menu-blue:hover {
+  background: linear-gradient(135deg, rgba(104,144,240,0.25), rgba(104,144,240,0.12));
+  border-color: rgba(104,144,240,0.65);
+  box-shadow: 0 0 16px rgba(104,144,240,0.2);
+}
+
+.pk-menu-btn.pk-menu-gold {
+  background: linear-gradient(135deg, rgba(248,208,48,0.12), rgba(248,208,48,0.05));
+  border-color: rgba(248,208,48,0.35);
+  color: var(--pk-text);
+}
+.pk-menu-btn.pk-menu-gold:hover {
+  background: linear-gradient(135deg, rgba(248,208,48,0.22), rgba(248,208,48,0.1));
+  border-color: rgba(248,208,48,0.65);
+  box-shadow: 0 0 16px rgba(248,208,48,0.2);
+}
+
+/* ── Pokédex data panel (stat cards) ───────────────────── */
+.pk-dex-panel {
+  background: #0d1120;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 0.75rem;
+  padding: clamp(0.875rem, 2vw, 1.125rem);
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.pk-dex-panel::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--pk-red), transparent);
+  opacity: 0.6;
+}
+
+.pk-dex-panel:hover {
+  border-color: rgba(239,68,68,0.3);
+  box-shadow: 0 0 20px rgba(239,68,68,0.1);
+}
+
+/* ── Pokédex data row ────────────────────────────────────── */
+.pk-dex-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.35rem 0;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.pk-dex-row:last-child { border-bottom: none; }
+
+/* ── Battle log row (History page) ──────────────────────── */
+.pk-battle-log-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  gap: 0.75rem 1rem;
+  align-items: center;
+  padding: 0.875rem 1rem;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  transition: background 0.15s ease;
+  position: relative;
+}
+
+.pk-battle-log-row:last-child { border-bottom: none; }
+
+.pk-battle-log-row::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: transparent;
+  border-radius: 0 2px 2px 0;
+  transition: background 0.15s ease;
+}
+
+.pk-battle-log-row:hover { background: rgba(239,68,68,0.04); }
+.pk-battle-log-row:hover::before { background: var(--pk-red); }
+
+/* ── VS Stamp (result badge) ────────────────────────────── */
+.pk-vs-stamp {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-family: var(--font-pixel);
+  font-size: 0.42rem;
+  letter-spacing: 0.06em;
+  border-radius: 0.25rem;
+  padding: 0.25rem 0.6rem;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.pk-vs-stamp.correct {
+  background: rgba(74,222,128,0.12);
+  color: #4ADE80;
+  border: 1px solid rgba(74,222,128,0.3);
+}
+
+.pk-vs-stamp.wrong {
+  background: rgba(239,68,68,0.12);
+  color: #F87171;
+  border: 1px solid rgba(239,68,68,0.3);
+}
+
+.pk-vs-stamp.pending {
+  background: rgba(255,255,255,0.06);
+  color: var(--pk-text-muted);
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+/* ── Game-style pixel loading message ───────────────────── */
+.pk-loading-msg {
+  text-align: center;
+  padding: 3rem 0;
+}
+
+.pk-loading-msg .pk-loading-title {
+  margin: 1rem 0 0.4rem;
+  font-family: var(--font-pixel);
+  font-size: 0.55rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  animation: gold-pulse 1.5s ease-in-out infinite;
+  color: var(--pk-gold);
+}
+
+.pk-loading-msg .pk-loading-sub {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--pk-text-dim);
+}
+
+/* ── GBA HP bar repurposed as metric bar ─────────────────── */
+.pk-metric-bar-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 0.5rem;
+}
+
+.pk-metric-bar-track {
+  height: 8px;
+  background: #1a1a2e;
+  border: 1px solid rgba(255,255,255,0.12);
+  overflow: hidden;
+  position: relative;
+}
+
+.pk-metric-bar-fill {
+  height: 100%;
+  transition: width 1s ease-out;
+  image-rendering: pixelated;
+}
+
+.pk-metric-bar-fill.bar-green  { background: #58C84A; box-shadow: 0 0 6px rgba(88,200,74,0.7); }
+.pk-metric-bar-fill.bar-yellow { background: #E0C030; box-shadow: 0 0 6px rgba(224,192,48,0.7); }
+.pk-metric-bar-fill.bar-red    { background: #E82828; box-shadow: 0 0 6px rgba(232,40,40,0.7); }
+.pk-metric-bar-fill.bar-blue   { background: #6890F0; box-shadow: 0 0 6px rgba(104,144,240,0.7); }
+
+/* Pixel-step effect inside metric bar */
+.pk-metric-bar-fill::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    90deg,
+    transparent 0px,
+    transparent 5px,
+    rgba(0,0,0,0.15) 5px,
+    rgba(0,0,0,0.15) 6px
+  );
+}
+
+/* ── Pokémon counter card (Engine 2 result) ──────────────── */
+.pk-counter-card {
+  position: relative;
+  border-radius: 0.875rem;
+  background: #0d1120;
+  border: 1px solid rgba(255,255,255,0.08);
+  padding: clamp(0.875rem, 2vw, 1.125rem);
+  overflow: hidden;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.pk-counter-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: var(--card-accent, var(--pk-red));
+  opacity: 0.7;
+}
+
+.pk-counter-card:hover {
+  border-color: rgba(239,68,68,0.3);
+  box-shadow: 0 0 24px rgba(239,68,68,0.12);
+  transform: translateY(-2px);
+}
+
+/* ── Filter bar — game menu style ───────────────────────── */
+.pk-filter-bar {
+  background: #0d1120;
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 0.75rem;
+  padding: clamp(0.75rem, 2vw, 1rem);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: flex-end;
+  margin-bottom: 1rem;
+  position: relative;
+}
+
+.pk-filter-bar::before {
+  content: '◆ FILTERS';
+  position: absolute;
+  top: -0.55rem;
+  left: 1rem;
+  background: #0d1120;
+  padding: 0 0.4rem;
+  font-family: var(--font-pixel);
+  font-size: 0.38rem;
+  color: var(--pk-red);
+  letter-spacing: 0.1em;
+}
+
+/* ── Battle predictor result header ─────────────────────── */
+.pk-battle-result-header {
+  position: relative;
+  border-radius: 0.875rem;
+  overflow: hidden;
+  padding: 1.25rem 1.5rem;
+}
+
+/* ── Opponent pill tag ──────────────────────────────────── */
+.pk-opponent-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border-radius: 0.5rem;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  padding: 0.35rem 0.7rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--pk-text);
+  text-transform: capitalize;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.pk-opponent-tag:hover {
+  background: rgba(239,68,68,0.08);
+  border-color: rgba(239,68,68,0.3);
+}
+
+/* ── Diagonal stripe (arena decorative) ─────────────────── */
+.pk-arena-stripe {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* ── Type-reactive container ─────────────────────────────── */
+.pk-type-card {
+  position: relative;
+  border-radius: 1rem;
+  overflow: hidden;
+  background: #0d1120;
+  transition: border-color 0.4s ease, box-shadow 0.4s ease;
+}
+
+/* ── Pixel corner brackets (decorative) ─────────────────── */
+.pk-bracket {
+  position: relative;
+}
+.pk-bracket::before,
+.pk-bracket::after {
+  content: '';
+  position: absolute;
+  width: 10px; height: 10px;
+  border-color: var(--pk-red);
+  border-style: solid;
+  opacity: 0.5;
+}
+.pk-bracket::before { top: 6px; left: 6px; border-width: 2px 0 0 2px; }
+.pk-bracket::after  { bottom: 6px; right: 6px; border-width: 0 2px 2px 0; }
+
+/* ── Dashboard stat card game-panel style ─────────────────── */
+.pk-stat-panel {
+  background: #0d1120;
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 0.75rem;
+  padding: clamp(0.875rem, 2vw, 1.125rem);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.pk-stat-panel::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--panel-accent, rgba(239,68,68,0.5)), transparent);
+}
+
+.pk-stat-panel:hover {
+  border-color: var(--panel-accent, rgba(239,68,68,0.3));
+  box-shadow: 0 0 20px rgba(239,68,68,0.08);
+}
+
+/* ── Scrolling battle ticker (decorative) ─────────────────── */
+@keyframes scroll-left {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.pk-ticker-track {
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.pk-ticker-inner {
+  display: inline-block;
+  animation: scroll-left 20s linear infinite;
+  font-family: var(--font-pixel);
+  font-size: 0.38rem;
+  color: var(--pk-text-dim);
+  letter-spacing: 0.08em;
+}
+
+/* ── Metrics page — stat bar label row ─────────────────── */
+.pk-metric-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.25rem;
+}
+
+.pk-metric-row .pk-metric-label {
+  font-family: var(--font-pixel);
+  font-size: 0.44rem;
+  color: var(--pk-text-muted);
+  letter-spacing: 0.06em;
+}
+
+.pk-metric-row .pk-metric-value {
+  font-family: var(--font-pixel);
+  font-size: 0.5rem;
+  color: var(--pk-text);
+  letter-spacing: 0.04em;
+}
+
+/* ── In-game dialog box style (narration panels) ─────────── */
+.pk-dialog-box {
+  background: #1a1a2e;
+  border: 3px solid rgba(255,255,255,0.85);
+  border-radius: 0;
+  padding: 0.875rem 1.25rem;
+  position: relative;
+  font-family: var(--font-pixel);
+  font-size: 0.55rem;
+  color: #fff;
+  line-height: 2;
+  letter-spacing: 0.04em;
+}
+
+.pk-dialog-box::before {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border: 1px solid rgba(255,255,255,0.15);
+  pointer-events: none;
+}
+
+/* ── History page: battle entry number ──────────────────── */
+.pk-battle-num {
+  font-family: var(--font-pixel);
+  font-size: 0.4rem;
+  color: var(--pk-text-dim);
+  min-width: 2.5rem;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* ── Pokémon DB: game-style count badge ─────────────────── */
+.pk-count-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: rgba(239,68,68,0.1);
+  border: 1px solid rgba(239,68,68,0.3);
+  border-radius: 0.375rem;
+  padding: 0.2rem 0.6rem;
+  font-family: var(--font-pixel);
+  font-size: 0.42rem;
+  color: var(--pk-red);
+  letter-spacing: 0.06em;
+}
+
+/* ── Engine 2/3 arena card header strip ─────────────────── */
+.pk-arena-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  background: rgba(0,0,0,0.35);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+/* ── Pixel divider (horizontal rule) ────────────────────── */
+.pk-pixel-hr {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(239,68,68,0.4), rgba(112,56,248,0.4), transparent);
+  margin: 0.75rem 0;
+  border: none;
+}
+
+/* ── Battle screen summary tiles (History page mini-stats) ── */
+.pk-history-stat {
+  background: #0d1120;
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 0.625rem;
+  padding: 0.75rem;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.pk-history-stat::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+}
+
+.pk-history-stat.stat-total::before  { background: var(--pk-text-dim); }
+.pk-history-stat.stat-correct::before { background: #4ADE80; }
+.pk-history-stat.stat-pending::before { background: var(--pk-gold); }
+.pk-history-stat.stat-wrong::before   { background: #F87171; }
+
+/* ── Record result game-flavour panel ───────────────────── */
+.pk-record-panel {
+  background: #0d1120;
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 0.875rem;
+  padding: clamp(1rem, 2.5vw, 1.5rem);
+  position: relative;
+  overflow: hidden;
+}
+
+.pk-record-panel::before {
+  content: '◆ RECORD RESULT';
+  position: absolute;
+  top: -0.55rem;
+  left: 1rem;
+  background: #0d1120;
+  padding: 0 0.4rem;
+  font-family: var(--font-pixel);
+  font-size: 0.38rem;
+  color: var(--pk-text-muted);
+  letter-spacing: 0.1em;
+}
+
+/* ── Page-level checkerboard arena floor ─────────────────── */
+.pk-page-arena {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.018;
+  background-image:
+    linear-gradient(45deg, #EF4444 25%, transparent 25%),
+    linear-gradient(-45deg, #EF4444 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #EF4444 75%),
+    linear-gradient(-45deg, transparent 75%, #EF4444 75%);
+  background-size: 32px 32px;
+  background-position: 0 0, 0 16px, 16px -16px, -16px 0px;
+}
+
+/* ── Radial page glow (subtle) ──────────────────────────── */
+.pk-page-glow {
+  position: fixed;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 800px;
+  height: 400px;
+  background: radial-gradient(ellipse 50% 50% at 50% 0%, rgba(239,68,68,0.06) 0%, transparent 70%);
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* ── Dashboard battle station Pokéball glow ─────────────── */
+.pk-pokeball-station {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  flex: 1;
+  min-width: 180px;
+  background: #0d1120;
+  border: 1px solid rgba(220,38,38,0.2);
+  border-radius: 1rem;
+  padding: 1.5rem 1.25rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.pk-pokeball-station::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 60% 40% at 50% 80%, rgba(239,68,68,0.08) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+/* ── Engine page card (full arena container) ────────────── */
+.pk-engine-card {
+  position: relative;
+  border-radius: 1rem;
+  overflow: hidden;
+  margin-bottom: 1.25rem;
+  background: #0d1120;
+  transition: border-color 0.4s ease, box-shadow 0.4s ease;
+}
+
+/* ── Type-reactive submit button ─────────────────────────── */
+.pk-type-submit {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  border-radius: 0.625rem;
+  color: #fff;
+  font-family: var(--font-pixel);
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  padding: 0.75rem 2rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-transform: uppercase;
+  border: 2px solid;
+}
+
+.pk-type-submit:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* ── Accuracy chart GBA frame ────────────────────────────── */
+.pk-chart-frame {
+  background: #0d1a0d;
+  border: 3px solid #1a2a1a;
+  border-radius: 4px;
+  padding: 0.5rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.pk-chart-frame::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,255,60,0.018) 3px, rgba(0,255,60,0.018) 4px);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* ── Pokémon DB — sticky filter chip ──────────────────────── */
+.pk-type-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border-radius: 0.4rem;
+  padding: 0.25rem 0.5rem;
+  font-family: var(--font-pixel);
+  font-size: 0.38rem;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.15s ease;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* ── Scrollable history list (replaces table on mobile) ──── */
+@media (max-width: 640px) {
+  .pk-battle-log-row {
+    grid-template-columns: 1fr auto;
+  }
+}
+
+/* ── Metrics confusion cell — game flavour ───────────────── */
+.pk-confusion-cell {
+  border-radius: 0.625rem;
+  padding: 0.875rem;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.pk-confusion-cell::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: var(--cell-accent, currentColor);
+  opacity: 0.5;
+}
+
+/* ── Blinking cursor for pixel labels ───────────────────── */
+@keyframes pixel-blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+.pk-blink {
+  animation: pixel-blink 1s step-end infinite;
+}
+
+/* ── Game-over / no data state ───────────────────────────── */
+.pk-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 3rem;
+  text-align: center;
+}
+
+.pk-empty-state .pk-empty-icon {
+  font-size: 2.5rem;
+  opacity: 0.4;
+}
+
+.pk-empty-state .pk-empty-title {
+  font-family: var(--font-pixel);
+  font-size: 0.55rem;
+  color: var(--pk-text-muted);
+  letter-spacing: 0.08em;
+}
+
+/* ── Dashboard header arena strip ──────────────────────────── */
+.pk-dashboard-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: clamp(1rem, 3vw, 2rem);
+  margin-bottom: clamp(1.5rem, 4vw, 2.5rem);
+  align-items: flex-start;
+}
+
+/* ── Section divider with label ─────────────────────────── */
+.pk-labeled-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0.875rem 0;
+}
+
+.pk-labeled-divider::before,
+.pk-labeled-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: rgba(255,255,255,0.06);
+}
+
+.pk-labeled-divider span {
+  font-family: var(--font-pixel);
+  font-size: 0.38rem;
+  color: var(--pk-text-dim);
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+}
+
+/* ── Hoverable table row with left glow ─────────────────── */
+.pk-log-table-row {
+  transition: background 0.15s ease;
+  position: relative;
+  cursor: default;
+}
+.pk-log-table-row:hover {
+  background: rgba(239,68,68,0.05);
+}
+.pk-log-table-row:hover td:first-child::before {
+  content: '▶';
+  position: absolute;
+  left: 0.35rem;
+  top: 50%;
+  transform: translateY(-50%);
+  font-family: var(--font-pixel);
+  font-size: 0.4rem;
+  color: var(--pk-red);
+}
+
+/* ── Quick-actions game menu container ──────────────────── */
+.pk-quick-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 0.625rem;
+  overflow: hidden;
+}
+
+.pk-quick-action-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  text-decoration: none;
+  color: var(--pk-text);
+  transition: background 0.15s ease, color 0.15s ease;
+  font-family: var(--font-pixel);
+  font-size: 0.5rem;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  background: none;
+  border-left: none;
+  border-right: none;
+  border-top: none;
+  width: 100%;
+  text-align: left;
+}
+
+.pk-quick-action-item:last-child { border-bottom: none; }
+
+.pk-quick-action-item:hover {
+  background: rgba(239,68,68,0.08);
+  color: var(--pk-text);
+}
+
+.pk-quick-action-item .item-arrow {
+  margin-left: auto;
+  font-size: 0.5rem;
+  color: var(--pk-text-dim);
+  transition: color 0.15s ease, transform 0.15s ease;
+}
+
+.pk-quick-action-item:hover .item-arrow {
+  color: var(--pk-red);
+  transform: translateX(2px);
+}
+
+/* ── GBA HP bar repurposed as accuracy timeline bar ─────── */
+.pk-accuracy-timeline {
+  background: #0d1a0d;
+  border: 2px solid #1a2a1a;
+  border-radius: 3px;
+  padding: 0.5rem;
+  position: relative;
+}
+
+/* ── Table scroll indicator ─────────────────────────────── */
+.pk-table-scroll-hint {
+  font-family: var(--font-pixel);
+  font-size: 0.38rem;
+  color: var(--pk-text-dim);
+  letter-spacing: 0.06em;
+  text-align: right;
+  padding: 0.4rem 0.875rem;
+  border-top: 1px solid rgba(255,255,255,0.04);
+}
+
+/* ── Pokémon DB: GBA scanline overlay on sprite cell ────── */
+.pk-sprite-cell {
+  position: relative;
+  padding: 0.375rem 0.5rem;
+  text-align: center;
+}
+
+/* ── Battle predictor ANALYSE button game-style ─────────── */
+.pk-analyse-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  border-radius: 0.625rem;
+  padding: 0.75rem 2rem;
+  font-family: var(--font-pixel);
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 2px solid var(--pk-red);
+  background: linear-gradient(135deg, rgba(239,68,68,0.2), rgba(239,68,68,0.1));
+  color: #fff;
+  box-shadow: 0 0 20px rgba(239,68,68,0.2);
+}
+
+.pk-analyse-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, rgba(239,68,68,0.35), rgba(239,68,68,0.18));
+  box-shadow: 0 0 28px rgba(239,68,68,0.35);
+}
+
+.pk-analyse-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* ── Flash animation for battle-reveal ────────────────────── */
+@keyframes battle-reveal-anim {
+  0%   { opacity: 1; }
+  20%  { opacity: 0; }
+  40%  { opacity: 0.7; }
+  60%  { opacity: 0; }
+  80%  { opacity: 0.4; }
+  100% { opacity: 0; }
+}
+
+/* ── Responsive: collapse battle screen on mobile ─────────── */
+@media (max-width: 640px) {
+  .battle-screen {
+    grid-template-columns: 1fr;
+  }
+  .battle-vs-badge {
+    margin: 0 auto;
+  }
+}
+
+/* ── Engine 2 opponent name label  ───────────────────────── */
+.pk-slot-number {
+  width: 1.5rem;
+  text-align: center;
+  font-family: var(--font-pixel);
+  font-size: 0.55rem;
+  color: var(--pk-red);
+  flex-shrink: 0;
+}
+
+/* ── Pokédex DB counters row  ───────────────────────────── */
+.pk-db-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.875rem;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+/* ── Accuracy chart legend  ─────────────────────────────── */
+.pk-chart-legend {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.375rem;
+}
+
+.pk-chart-legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ── Pokémon DB: selected filter highlight ──────────────── */
+.pk-filter-active {
+  border-color: var(--pk-red) !important;
+  box-shadow: 0 0 0 2px rgba(239,68,68,0.2);
+}
+
+/* ── Trainer card title label (dashboard header) ─────────── */
+.pk-trainer-label {
+  font-family: var(--font-pixel);
+  font-size: 0.45rem;
+  color: var(--pk-text-dim);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 0.3rem;
+}
+
+/* ── HP-style progress bar for model metrics ────────────── */
+.hp-bar-metric {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.35rem;
+}
+
+.hp-bar-metric-track {
+  flex: 1;
+  height: 8px;
+  background: #1a1a2e;
+  border: 1px solid rgba(255,255,255,0.12);
+  overflow: hidden;
+}
+
+.hp-bar-metric-fill {
+  height: 100%;
+  transition: width 1s ease-out;
+  image-rendering: pixelated;
+  position: relative;
+}
+
+.hp-bar-metric-fill.hp-high  { background: #58C84A; box-shadow: 0 0 6px rgba(88,200,74,0.7); }
+.hp-bar-metric-fill.hp-mid   { background: #E0C030; box-shadow: 0 0 6px rgba(224,192,48,0.7); }
+.hp-bar-metric-fill.hp-low   { background: #E82828; box-shadow: 0 0 6px rgba(232,40,40,0.7); }
+.hp-bar-metric-fill.hp-blue  { background: #6890F0; box-shadow: 0 0 6px rgba(104,144,240,0.7); }
+
+/* Pixel segmentation on HP bar */
+.hp-bar-metric-fill::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(90deg, transparent 0, transparent 5px, rgba(0,0,0,0.2) 5px, rgba(0,0,0,0.2) 6px);
+}
+
+/* ── MetricCard: HP bar section ─────────────────────────── */
+.pk-metric-card-hp {
+  margin-top: 0.5rem;
+}
+
+/* ── Prediction confidence bar (Engine 3 / History) ─────── */
+.pk-conf-bar-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-pixel);
+  font-size: 0.42rem;
+  color: var(--pk-gold);
+}
+
+/* ── Full viewport subtle grid ───────────────────────────── */
+@keyframes arena-drift {
+  0%   { transform: translateX(0) translateY(0); }
+  100% { transform: translateX(-32px) translateY(-32px); }
+}
+
+/* ============================================================
+   POKÉMON BATTLE TRANSITION — Gen 1–3 iris wipe + flash
+   ============================================================ */
+
+/* Shared overlay container — sits above everything, pointer-events none */
+.pk-transition-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+/* ── Battle flash ────────────────────────────────────────── */
+/* Full-screen white flash triggered by JS opacity toggle */
+.pk-flash {
+  position: absolute;
+  inset: 0;
+  background: #ffffff;
+  /* Transition handled by inline opacity toggle — very short so it feels like
+     a camera flash. No CSS transition needed; state changes are ~60ms apart. */
+}
+
+/* ── Pokéball iris ───────────────────────────────────────── */
+/* clip-path is driven by inline style + JS-controlled transition timing */
+.pk-iris {
+  position: absolute;
+  inset: 0;
+  background: #000000;
+  /* clip-path transition is set inline so JS can control duration and easing
+     independently for the close and open passes */
+}
+
+/* Pokéball equator decoration — the red/white dividing line at 50% height */
+.pk-iris-equator {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 6px;
+  /* Pokéball split: top half = white hint, bottom = slightly warm */
+  background: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.18) 0%,
+    rgba(255, 255, 255, 0.18) 40%,
+    rgba(220, 38, 38, 0.55)   50%,
+    rgba(220, 38, 38, 0.55)   60%,
+    rgba(255, 255, 255, 0.10) 100%
+  );
+}
+
+/* ── CRT scan-line sweep ─────────────────────────────────── */
+/* A single 2px bright line that travels from top to bottom of the screen,
+   mimicking a CRT monitor powering on. Overlaps with the iris open animation. */
+@keyframes pk-scan-sweep {
+  0%   { top: -2px;   opacity: 0.55; }
+  10%  { opacity: 0.55; }
+  85%  { opacity: 0.30; }
+  100% { top: 100%;   opacity: 0; }
+}
+
+.pk-scanline-sweep {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -2px;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.20);
+  box-shadow: 0 0 8px 2px rgba(255, 255, 255, 0.15);
+  animation: pk-scan-sweep linear forwards;
+  /* animationDuration is set inline from JS so the timing constant is
+     the single source of truth in the component */
+}
+
+/* ── Reduced-motion override ─────────────────────────────── */
+/* If the user prefers reduced motion: skip flash and scan-line entirely;
+   the iris still closes/opens but with a much shorter duration override. */
+@media (prefers-reduced-motion: reduce) {
+  .pk-flash {
+    display: none;
+  }
+  .pk-iris {
+    transition-duration: 120ms !important;
+  }
+  .pk-scanline-sweep {
+    display: none;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════
+   GAME IMMERSION PASS 2 — Pokédex device header, battle cards,
+   region badges, restricted badges, confusion cell glows,
+   Hall of Fame, game panel utility classes.
+   ════════════════════════════════════════════════════════════ */
+
+/* ── Pokédex device header bar ──────────────────────────────── */
+.pk-dex-header-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: linear-gradient(135deg, #CC0000 0%, #EF4444 50%, #CC0000 100%);
+  border-radius: 0.625rem 0.625rem 0 0;
+  padding: 0.625rem 1rem;
+  border-bottom: 2px solid #880000;
+  position: relative;
+  overflow: hidden;
+}
+
+.pk-dex-header-bar::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, transparent 60%);
+  pointer-events: none;
+}
+
+.pk-dex-header-bar .pk-dex-title {
+  font-family: var(--font-pixel);
+  font-size: 0.6rem;
+  color: #ffffff;
+  letter-spacing: 0.15em;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.4);
+  flex: 1;
+}
+
+.pk-dex-header-bar .pk-dex-count {
+  font-family: var(--font-pixel);
+  font-size: 0.38rem;
+  color: rgba(255,220,220,0.85);
+  letter-spacing: 0.08em;
+}
+
+.pk-dex-header-light {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #88ccff, #2266cc);
+  box-shadow: 0 0 8px rgba(34,102,204,0.8);
+  border: 2px solid #1144aa;
+  flex-shrink: 0;
+}
+
+/* ── Region badge ────────────────────────────────────────────── */
+.pk-region-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-family: var(--font-pixel);
+  font-size: 0.35rem;
+  color: #78C850;
+  border: 1px solid rgba(120,200,80,0.4);
+  border-radius: 0.2rem;
+  padding: 0.1rem 0.35rem;
+  letter-spacing: 0.06em;
+  background: #0e1a0a;
+  white-space: nowrap;
+}
+
+/* ── Restricted badge ────────────────────────────────────────── */
+.pk-restricted-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-family: var(--font-pixel);
+  font-size: 0.35rem;
+  color: #EF4444;
+  border: 1px solid rgba(239,68,68,0.4);
+  border-radius: 0.2rem;
+  padding: 0.1rem 0.35rem;
+  letter-spacing: 0.06em;
+  background: #1e0d0d;
+  white-space: nowrap;
+}
+
+/* ── Battle result card (History page redesign) ─────────────── */
+.pk-battle-card {
+  background: linear-gradient(135deg, #0e1225 0%, #0a0e1a 100%);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 0.75rem;
+  padding: clamp(0.875rem, 2vw, 1.125rem);
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.pk-battle-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    -45deg,
+    transparent 0,
+    transparent 12px,
+    rgba(255,255,255,0.012) 12px,
+    rgba(255,255,255,0.012) 13px
+  );
+  pointer-events: none;
+}
+
+.pk-battle-card.card-correct {
+  border-color: rgba(74,222,128,0.25);
+}
+.pk-battle-card.card-correct:hover {
+  border-color: rgba(74,222,128,0.45);
+  box-shadow: 0 0 20px rgba(74,222,128,0.1);
+}
+
+.pk-battle-card.card-wrong {
+  border-color: rgba(239,68,68,0.2);
+}
+.pk-battle-card.card-wrong:hover {
+  border-color: rgba(239,68,68,0.4);
+  box-shadow: 0 0 20px rgba(239,68,68,0.1);
+}
+
+.pk-battle-card.card-pending {
+  border-color: rgba(248,208,48,0.2);
+}
+.pk-battle-card.card-pending:hover {
+  border-color: rgba(248,208,48,0.35);
+  box-shadow: 0 0 20px rgba(248,208,48,0.08);
+}
+
+/* ── Battle record header stats bar ────────────────────────── */
+.pk-record-stat-bar {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+@media (max-width: 540px) {
+  .pk-record-stat-bar {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* ── Trainer name chip (battle cards) ──────────────────────── */
+.pk-trainer-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-weight: 800;
+  font-size: clamp(0.75rem, 1.5vw, 0.9rem);
+  text-transform: capitalize;
+  letter-spacing: 0.02em;
+}
+
+.pk-trainer-chip.team-a { color: #EF4444; }
+.pk-trainer-chip.team-b { color: #6890F0; }
+
+/* ── Battle card team chip pills ───────────────────────────── */
+.pk-team-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-top: 0.35rem;
+}
+
+.pk-team-chip-pill {
+  font-family: var(--font-pixel);
+  font-size: 0.3rem;
+  padding: 0.08rem 0.35rem;
+  border-radius: 0.2rem;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.09);
+  color: var(--pk-text-dim);
+  letter-spacing: 0.04em;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+
+/* ── Battle card replay link ────────────────────────────────── */
+.pk-replay-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-family: var(--font-pixel);
+  font-size: 0.38rem;
+  color: var(--pk-red);
+  text-decoration: none;
+  border: 1px solid rgba(239,68,68,0.3);
+  border-radius: 0.25rem;
+  padding: 0.2rem 0.5rem;
+  letter-spacing: 0.04em;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.pk-replay-btn:hover {
+  background: rgba(239,68,68,0.1);
+  border-color: rgba(239,68,68,0.6);
+}
+
+/* ── VS separator in battle cards ──────────────────────────── */
+.pk-vs-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  flex-shrink: 0;
+  min-width: 60px;
+}
+
+/* ── Stamp badges (rotated) ────────────────────────────────── */
+.pk-stamp-correct {
+  font-family: var(--font-pixel);
+  font-size: 0.42rem;
+  color: #4ADE80;
+  border: 2px solid #4ADE80;
+  border-radius: 0.25rem;
+  padding: 0.2rem 0.5rem;
+  display: inline-block;
+  transform: rotate(-2deg);
+  text-shadow: 0 0 8px rgba(74,222,128,0.5);
+  box-shadow: 0 0 8px rgba(74,222,128,0.2);
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
+.pk-stamp-wrong {
+  font-family: var(--font-pixel);
+  font-size: 0.42rem;
+  color: #EF4444;
+  border: 2px solid #EF4444;
+  border-radius: 0.25rem;
+  padding: 0.2rem 0.5rem;
+  display: inline-block;
+  transform: rotate(2deg);
+  text-shadow: 0 0 8px rgba(239,68,68,0.5);
+  box-shadow: 0 0 8px rgba(239,68,68,0.2);
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
+.pk-stamp-pending {
+  font-family: var(--font-pixel);
+  font-size: 0.42rem;
+  color: var(--pk-gold);
+  border: 2px solid rgba(248,208,48,0.5);
+  border-radius: 0.25rem;
+  padding: 0.2rem 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
+/* ── Confusion cell quadrant glows ──────────────────────────── */
+.pk-confusion-cell.cell-tp {
+  box-shadow: inset 0 0 20px rgba(74,222,128,0.08), 0 0 12px rgba(74,222,128,0.06);
+}
+.pk-confusion-cell.cell-fp {
+  box-shadow: inset 0 0 20px rgba(239,68,68,0.08), 0 0 12px rgba(239,68,68,0.06);
+}
+.pk-confusion-cell.cell-tn {
+  box-shadow: inset 0 0 20px rgba(104,144,240,0.08), 0 0 12px rgba(104,144,240,0.06);
+}
+.pk-confusion-cell.cell-fn {
+  box-shadow: inset 0 0 20px rgba(251,191,36,0.08), 0 0 12px rgba(251,191,36,0.06);
+}
+
+/* ── Pokéball watermark in confusion cells ──────────────────── */
+.pk-confusion-cell::after {
+  content: '';
+  position: absolute;
+  right: -12px;
+  bottom: -12px;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  border: 8px solid currentColor;
+  opacity: 0.04;
+  pointer-events: none;
+}
+
+/* ── Hall of Fame section ────────────────────────────────────── */
+.pk-hof-panel {
+  background: linear-gradient(135deg, #1a1200 0%, #0d0a00 100%);
+  border: 1px solid rgba(248,208,48,0.25);
+  border-radius: 0.875rem;
+  padding: clamp(1rem, 2.5vw, 1.5rem);
+  position: relative;
+  overflow: hidden;
+}
+
+.pk-hof-panel::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--pk-gold), transparent);
+}
+
+.pk-hof-trophy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, rgba(248,208,48,0.3), rgba(184,160,56,0.1));
+  border: 2px solid rgba(248,208,48,0.4);
+  box-shadow: 0 0 16px rgba(248,208,48,0.2);
+  font-size: 1.4rem;
+  flex-shrink: 0;
+  animation: badge-pulse 2.5s ease-in-out infinite;
+}
+
+/* ── Gym badge glow animation ───────────────────────────────── */
+@keyframes badge-pulse {
+  0%, 100% { box-shadow: 0 0 8px currentColor; }
+  50% { box-shadow: 0 0 20px currentColor, 0 0 40px currentColor; }
+}
+
+.pk-badge-glow { animation: badge-pulse 2.5s ease-in-out infinite; }
+
+/* ================================================================
+   POKEMON INTRO + LOGIN ENHANCEMENTS — appended 2026-06-02
+   ================================================================ */
+
+/* ── Intro sequence keyframes ───────────────────────────────── */
+@keyframes intro-fade-in  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes intro-slide-up { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes intro-blink-dot { 0%,49%{opacity:0}50%,100%{opacity:1} }
+@keyframes intro-pokeball-fall {
+  0%   { transform: translateY(-60px) rotate(0deg); opacity: 0; }
+  10%  { opacity: 0.18; }
+  90%  { opacity: 0.12; }
+  100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+}
+@keyframes intro-dash-draw {
+  from { stroke-dashoffset: 200; }
+  to   { stroke-dashoffset: 0; }
+}
+
+/* ── Login page pokéball pulse glow ─────────────────────────── */
+@keyframes pulse-glow {
+  0%, 100% { filter: drop-shadow(0 0 10px rgba(239,68,68,0.45)); }
+  50%       { filter: drop-shadow(0 0 22px rgba(239,68,68,0.85)) drop-shadow(0 0 40px rgba(239,68,68,0.3)); }
+}
+.animate-glow svg {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* ── Gen 1 title screen glow text ───────────────────────────── */
+.pk-title-glow {
+  text-shadow:
+    0 0 10px rgba(239,68,68,0.8),
+    0 0 20px rgba(239,68,68,0.4),
+    0 0 40px rgba(239,68,68,0.2);
+  animation: title-flicker 4s ease-in-out infinite;
+}
+@keyframes title-flicker {
+  0%, 90%, 100% { opacity: 1; }
+  92%            { opacity: 0.85; }
+  94%            { opacity: 1; }
+  96%            { opacity: 0.9; }
+}
+
+/* ── Pokémon game cartridge label style ─────────────────────── */
+.pk-cartridge-label {
+  display: inline-block;
+  background: linear-gradient(135deg, #CC0000, #EF4444);
+  border: 2px solid #880000;
+  border-radius: 0.35rem;
+  padding: 0.2rem 0.75rem;
+  font-family: var(--font-pixel);
+  font-size: 0.42rem;
+  color: #fff;
+  letter-spacing: 0.1em;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.2);
+}
+
+/* ── Legendary holographic border ───────────────────────────── */
+.pk-legendary-border {
+  border-image: linear-gradient(135deg, #F8D030, #EF4444, #A890F0, #F8D030) 1;
+  animation: legendary-border-shift 3s linear infinite;
+}
+@keyframes legendary-border-shift {
+  0%   { filter: hue-rotate(0deg); }
+  100% { filter: hue-rotate(360deg); }
+}
+
+/* ── Battle announcement text (large centered) ──────────────── */
+.pk-battle-announce {
+  font-family: var(--font-pixel);
+  font-size: clamp(0.8rem, 3vw, 1.4rem);
+  color: #fff;
+  text-align: center;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  text-shadow:
+    2px 2px 0 #000,
+    0 0 20px rgba(239,68,68,0.6);
+}
+
+/* ── HP bar critical flicker ────────────────────────────────── */
+@keyframes hp-critical {
+  0%, 100% { opacity: 1; box-shadow: 0 0 6px rgba(232,40,40,0.8); }
+  50%       { opacity: 0.6; box-shadow: 0 0 2px rgba(232,40,40,0.4); }
+}
+.hp-bar-critical {
+  animation: hp-critical 0.4s ease-in-out infinite;
+}
+
+/* ── Type effectiveness flash ───────────────────────────────── */
+.pk-super-effective {
+  animation: super-effective 0.6s ease-out forwards;
+}
+@keyframes super-effective {
+  0%   { transform: scale(1); }
+  15%  { transform: scale(1.15); color: #4ADE80; }
+  30%  { transform: scale(0.95); }
+  50%  { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+
+/* ── Nuzlocke-style fainted indicator ───────────────────────── */
+.pk-fainted {
+  filter: grayscale(1) brightness(0.4);
+  opacity: 0.5;
+}
+
+/* ── Mobile full-screen nav sheet ───────────────────────────── */
+.pk-nav-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 9100;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+.pk-nav-sheet.open {
+  pointer-events: all;
+  opacity: 1;
+}
+.pk-nav-sheet-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.75);
+}
+.pk-nav-sheet-panel {
+  position: relative;
+  background: #0a0e1a;
+  border-top: 2px solid #B71C1C;
+  border-radius: 1rem 1rem 0 0;
+  padding: 1rem;
+  transform: translateY(100%);
+  transition: transform 0.25s cubic-bezier(0.32, 0.72, 0, 1);
+  padding-bottom: calc(64px + 1rem);
+}
+.pk-nav-sheet.open .pk-nav-sheet-panel {
+  transform: translateY(0);
+}
+
+/* ── Game panel utility ─────────────────────────────────────── */
+.pk-game-panel {
+  background: linear-gradient(180deg, #1a1f35 0%, #0d1120 100%);
+  border: 2px solid rgba(255,255,255,0.12);
+  border-radius: 0.75rem;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05);
+  position: relative;
+  overflow: hidden;
+}
+
+.pk-game-panel::before {
+  content: '';
+  position: absolute;
+  top: 4px; left: 4px; right: 4px; bottom: 4px;
+  border: 1px solid rgba(255,255,255,0.04);
+  border-radius: 0.5rem;
+  pointer-events: none;
+}
+
+/* ── Guide modal — game manual style enhancements ───────────── */
+.pk-guide-tip-box {
+  background: rgba(248,208,48,0.05);
+  border: 1px solid rgba(248,208,48,0.2);
+  border-radius: 0.375rem;
+  padding: 0.625rem 0.875rem;
+  margin: 0.625rem 0;
+  position: relative;
+}
+
+.pk-guide-tip-box::before {
+  content: '▶ TIP:';
+  display: block;
+  font-family: var(--font-pixel);
+  font-size: 0.38rem;
+  color: var(--pk-gold);
+  letter-spacing: 0.08em;
+  margin-bottom: 0.3rem;
+}
+
+.pk-guide-quick-start {
+  background: rgba(239,68,68,0.05);
+  border: 1px solid rgba(239,68,68,0.2);
+  border-radius: 0.375rem;
+  padding: 0.75rem 1rem;
+  margin: 0.5rem 0 0.875rem;
+}
+
+.pk-guide-quick-start-title {
+  font-family: var(--font-pixel);
+  font-size: 0.44rem;
+  color: var(--pk-red);
+  letter-spacing: 0.1em;
+  margin: 0 0 0.5rem;
+}
+
+/* ── 3ISC section tab styling ───────────────────────────────── */
+.pk-3isc-region-block {
+  background: rgba(104,144,240,0.07);
+  border: 1px solid rgba(104,144,240,0.2);
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  margin: 0.5rem 0;
+}
+
+.pk-3isc-region-title {
+  font-family: var(--font-pixel);
+  font-size: 0.42rem;
+  color: #6890F0;
+  letter-spacing: 0.08em;
+  margin: 0 0 0.35rem;
+}
+
+.pk-3isc-restricted-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-top: 0.35rem;
+}
+
+.pk-3isc-restricted-chip {
+  font-family: var(--font-pixel);
+  font-size: 0.3rem;
+  color: #F87171;
+  background: #1c0d0d;
+  border: 1px solid rgba(239,68,68,0.2);
+  border-radius: 0.2rem;
+  padding: 0.1rem 0.35rem;
+  letter-spacing: 0.04em;
+  text-transform: capitalize;
+}
+
+/* ── Pokédex DB: number column in gold pixel font ────────────── */
+.pk-dex-num {
+  font-family: var(--font-pixel);
+  font-size: 0.42rem;
+  color: var(--pk-gold);
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  opacity: 0.8;
+}
+
+/* ── Pokédex expanded row: native region + restricted ────────── */
+.pk-popup-region-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* ── Weakness badge (2x type chip in red) ────────────────────── */
+.pk-weakness-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  font-family: var(--font-pixel);
+  font-size: 0.3rem;
+  color: #F87171;
+  background: #200d0d;
+  border: 1px solid rgba(239,68,68,0.3);
+  border-radius: 0.2rem;
+  padding: 0.1rem 0.3rem;
+  letter-spacing: 0.04em;
+}
+
+/* ════════════════════════════════════════════════════════════
+   ENHANCEMENT PASS 3 — Mobile nav + UI theming additions
+   All new rules only — no existing rules modified
+   ════════════════════════════════════════════════════════════ */
+
+/* ── Mobile bottom nav bar ───────────────────────────────── */
+.mobile-nav-bar {
+  display: none; /* hidden on desktop */
+}
+
+/* Hide the sidebar on mobile, show the bottom bar */
+@media (max-width: 768px) {
+  .mobile-nav-bar {
+    display: flex !important;
+  }
+  /* Hide sidebar */
+  .pokedex-sidebar {
+    display: none !important;
+  }
+  /* Full width main content with bottom padding so content clears the nav bar */
+  #main-content {
+    padding-bottom: 72px;
+  }
+}
+
+/* ── Wild Pokemon encounter shimmer on .pk-panel hover ──── */
+.pk-panel:hover::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(120deg, transparent 30%, rgba(255,255,255,0.04) 50%, transparent 70%);
+  background-size: 200% 100%;
+  animation: encounter-shimmer 0.6s ease-out forwards;
+  pointer-events: none;
+  border-radius: inherit;
+  z-index: 2;
+}
+@keyframes encounter-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ── Pokémon type pill chip — game-authentic badge style ─── */
+.pk-type-badge-game {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-family: var(--font-pixel);
+  font-size: 0.38rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-weight: 900;
+  border: 1px solid rgba(0,0,0,0.3);
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+  position: relative;
+  overflow: hidden;
+}
+.pk-type-badge-game::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 50%;
+  background: rgba(255,255,255,0.12);
+  border-radius: 999px 999px 0 0;
+  pointer-events: none;
+}
+
+/* ── "Wild Pokemon appeared!" text animation ─────────────── */
+.pk-wild-appear {
+  animation: wild-appear 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+}
+@keyframes wild-appear {
+  0%   { opacity: 0; transform: scale(0.7) translateY(10px); }
+  60%  { transform: scale(1.05) translateY(-2px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* ── Pokédex scan line effect for cards ──────────────────── */
+.pk-dex-scan {
+  position: relative;
+  overflow: hidden;
+}
+.pk-dex-scan::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(0,255,100,0.3), transparent);
+  animation: dex-scan 3s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 3;
+}
+@keyframes dex-scan {
+  0%   { top: 0%; opacity: 0; }
+  5%   { opacity: 1; }
+  95%  { opacity: 1; }
+  100% { top: 100%; opacity: 0; }
+}
+
+/* ── Game-style "level up" flash for stat bars ───────────── */
+.pk-levelup-flash {
+  animation: levelup 0.4s ease-out;
+}
+@keyframes levelup {
+  0%   { filter: brightness(1); }
+  30%  { filter: brightness(2.5); }
+  60%  { filter: brightness(1.5); }
+  100% { filter: brightness(1); }
+}
+
+/* ── Pokéball spinning loader (additional variant) ───────── */
+.pk-pokeball-spin {
+  width: 24px;
+  height: 24px;
+  position: relative;
+  flex-shrink: 0;
+}
+.pk-pokeball-spin::before,
+.pk-pokeball-spin::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  inset: 0;
+}
+.pk-pokeball-spin::before {
+  border-top: 3px solid var(--pk-red);
+  border-right: 3px solid transparent;
+  border-bottom: 3px solid transparent;
+  border-left: 3px solid transparent;
+  animation: pokeball-spin 0.8s linear infinite;
+}
+.pk-pokeball-spin::after {
+  border-top: 3px solid transparent;
+  border-right: 3px solid transparent;
+  border-bottom: 3px solid rgba(239,68,68,0.3);
+  border-left: 3px solid transparent;
+  animation: pokeball-spin 0.8s linear infinite reverse;
+}
+
+/* ── Mobile: tighter section padding + readability tweaks ── */
+@media (max-width: 768px) {
+  .pk-section {
+    padding: clamp(1rem, 4vw, 1.5rem);
+  }
+  /* Better readability for pixel text on small screens */
+  .oak-dialogue-text {
+    font-size: 0.48rem;
+    line-height: 1.9;
+  }
+  /* Region buttons wrap nicely on small screens */
+  .pk-filter-bar {
+    gap: 0.5rem;
+  }
+}
+
+/* ── Login page mobile layout ────────────────────────── */
+@media (max-width: 768px) {
+  /* Login card fits mobile screen */
+  .pk-login-card {
+    padding: clamp(1.25rem, 5vw, 1.75rem) !important;
+    border-radius: 0.75rem !important;
+  }
+  /* On mobile, the outer container pads properly */
+  .pk-login-outer {
+    padding: 1rem !important;
+    align-items: flex-start !important;
+    padding-top: 2rem !important;
+  }
+
+  /* Intro overlay: scale text for small screens */
+  .pk-intro-title-pokemon {
+    font-size: clamp(1rem, 8vw, 1.8rem) !important;
+  }
+  .pk-intro-title-engine {
+    font-size: clamp(0.45rem, 3vw, 0.7rem) !important;
+  }
+  .pk-intro-oak-text {
+    font-size: clamp(0.4rem, 2.5vw, 0.52rem) !important;
+  }
+  .pk-intro-dialogue {
+    height: auto !important;
+    min-height: 100px;
+    padding: 0.75rem 1rem !important;
+  }
+  .pk-intro-credit {
+    width: 140px !important;
+  }
+}
+
+/* ── Login card animated border ─────────────────────── */
+@keyframes login-border-glow {
+  0%, 100% { border-color: rgba(239,68,68,0.35); box-shadow: 0 0 40px rgba(239,68,68,0.1), 0 20px 60px rgba(0,0,0,0.6); }
+  50%       { border-color: rgba(239,68,68,0.65); box-shadow: 0 0 60px rgba(239,68,68,0.22), 0 20px 60px rgba(0,0,0,0.6); }
+}
+.pk-login-card-animated {
+  animation: login-border-glow 3s ease-in-out infinite;
+}
+
+/* ── Dashboard mobile responsive ────────────────────── */
+@media (max-width: 768px) {
+  .pk-dashboard-header {
+    flex-direction: column;
+  }
+  .pk-dashboard-header > *:first-child {
+    max-width: 100% !important;
+    width: 100% !important;
+    flex: none !important;
+  }
+}
