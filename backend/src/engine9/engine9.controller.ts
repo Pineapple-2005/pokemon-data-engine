@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { Engine9Service, ScanResult } from './engine9.service';
 
-const TEAM_SIZE_LIMIT = 4;
+const TEAM_SIZE_LIMIT = 6;
 
 @Controller('engine9')
 export class Engine9Controller {

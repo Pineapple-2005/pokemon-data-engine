@@ -7,7 +7,7 @@ import { api } from '@/lib/api';
 import type { Pokemon } from '@/types';
 
 const SPRITE_BASE = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon';
-const TEAM_SIZE_LIMIT = 4;
+const TEAM_SIZE_LIMIT = 6;
 
 const PLACEHOLDER_MOVES = ['Body Slam', 'Earthquake', 'Ice Beam', 'Thunderbolt'];
 

@@ -20,7 +20,7 @@ const TYPE_COLORS: Record<string, string> = {
   Rock:'#B8A038', Ghost:'#705898', Dragon:'#7038F8', Dark:'#705848',
   Steel:'#B8B8D0', Fairy:'#EE99AC',
 };
-const TEAM_SIZE_LIMIT = 4;
+const TEAM_SIZE_LIMIT = 6;
 
 function TypeBadge({ type, variant = 'neutral' }: { type: string; variant?: 'weak' | 'neutral' | 'resist' | 'cover' | 'gap' | 'rec' }) {
   const bg =
