@@ -1,4 +1,4 @@
-const TEAM_SIZE_LIMIT = 4;
+const TEAM_SIZE_LIMIT = 6;
 
 interface BattlePredictorDraft {
   battlerA?: string;
