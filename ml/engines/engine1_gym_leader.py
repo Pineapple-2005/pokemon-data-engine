@@ -72,7 +72,7 @@ def _extract_scaled_vector(pokemon: dict) -> np.ndarray:
 
 
 def _has_scaled_features(pokemon: dict) -> bool:
-    return any(c in pokemon for c in SCALED_COLS)
+    return any(pokemon.get(c) is not None for c in SCALED_COLS)
 
 
 def _normalize_matrix(X: np.ndarray) -> tuple[np.ndarray, MinMaxScaler]:

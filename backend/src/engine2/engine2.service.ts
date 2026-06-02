@@ -33,6 +33,71 @@ export class Engine2Service {
     private readonly audit: AuditService,
   ) {}
 
+  /**
+   * Returns the initial candidate pool before fallback/supplement logic is applied.
+   * Uses the user's personal pool (legendary-filtered) when available, otherwise
+   * falls back to the global is_assigned pool. Both paths respect challenger_region.
+   */
+  private async selectInitialPool(userId: string | undefined, challenger_region: string | undefined): Promise<Pokemon[]> {
+    if (userId) {
+      const userPool = (await this.db.getUserAssignedPokemon(userId))
+        .filter((p) => (p.restricted_status ?? 'none') === 'none');
+      if (userPool.length > 0) {
+        return challenger_region
+          ? userPool.filter((p) => p.native_region?.toLowerCase() === challenger_region.toLowerCase())
+          : userPool;
+      }
+    }
+    const f: Parameters<typeof this.db.findAllPokemon>[0] = { is_assigned: 1, restricted_status: 'none' };
+    if (challenger_region) f.native_region = challenger_region;
+    return this.db.findAllPokemon(f);
+  }
+
+  /** Merges unique extras into pool, keyed by lowercased name. */
+  private mergeExtras(pool: Pokemon[], extras: Pokemon[]): Pokemon[] {
+    const seen = new Set(pool.map((p) => p.name.toLowerCase()));
+    return [...pool, ...extras.filter((p) => !seen.has(p.name.toLowerCase()))];
+  }
+
+  /**
+   * Builds the non-restricted Pokémon pool for Engine 2 counter-pick scoring.
+   *
+   * Priority order:
+   *   1. User's personal pool (legendary-filtered), optionally narrowed by region.
+   *   2. Global is_assigned pool, optionally narrowed by region.
+   *   3. All non-restricted Pokémon narrowed by region (if is_assigned yields nothing).
+   *   4. All non-restricted Pokémon with no region constraint (last resort).
+   *
+   * After the above, if fewer than 6 candidates remain, the pool is supplemented
+   * so the ML engine can always return 6 counters.
+   */
+  private async resolveCounterPool(userId: string | undefined, challenger_region: string | undefined): Promise<Pokemon[]> {
+    let pool = await this.selectInitialPool(userId, challenger_region);
+
+    // Fallback: no is_assigned rows seeded — use all non-restricted Pokémon
+    if (pool.length === 0) {
+      const f: Parameters<typeof this.db.findAllPokemon>[0] = { restricted_status: 'none' };
+      if (challenger_region) f.native_region = challenger_region;
+      pool = await this.db.findAllPokemon(f);
+    }
+    // Last resort: drop region constraint entirely
+    if (pool.length === 0) {
+      pool = await this.db.findAllPokemon({ restricted_status: 'none' });
+    }
+
+    // Supplement to guarantee at least 6 candidates for ML scoring
+    if (pool.length < 6) {
+      const f: Parameters<typeof this.db.findAllPokemon>[0] = { restricted_status: 'none' };
+      if (challenger_region) f.native_region = challenger_region;
+      pool = this.mergeExtras(pool, await this.db.findAllPokemon(f));
+    }
+    if (pool.length < 6) {
+      pool = this.mergeExtras(pool, await this.db.findAllPokemon({ restricted_status: 'none' }));
+    }
+
+    return pool;
+  }
+
   async getCounterTeam(params: CounterTeamParams): Promise<Engine2Response> {
     const {
       opponent_team,
@@ -51,45 +116,8 @@ export class Engine2Service {
       });
     }
 
-    // 2. Load the counter-team pool.
-    //    If the user has a personal pool, use it (filtered by challenger_region if set).
-    //    Fall back to the global is_assigned=1 pool when the user has no personal pool.
-    let assignedPool: Pokemon[];
-
-    if (userId) {
-      const userPool = await this.db.getUserAssignedPokemon(userId);
-      if (userPool.length > 0) {
-        assignedPool = challenger_region
-          ? userPool.filter((p) => p.native_region?.toLowerCase() === challenger_region.toLowerCase())
-          : userPool;
-      } else {
-        // User has no personal pool — use global assigned pool as fallback
-        const poolFilter: Parameters<typeof this.db.findAllPokemon>[0] = {
-          is_assigned: 1,
-          restricted_status: 'none',
-        };
-        if (challenger_region) poolFilter.native_region = challenger_region;
-        assignedPool = await this.db.findAllPokemon(poolFilter);
-      }
-    } else {
-      const poolFilter: Parameters<typeof this.db.findAllPokemon>[0] = {
-        is_assigned: 1,
-        restricted_status: 'none',
-      };
-      if (challenger_region) poolFilter.native_region = challenger_region;
-      assignedPool = await this.db.findAllPokemon(poolFilter);
-    }
-
-    // Final fallback: if still empty (no is_assigned rows seeded), use all non-restricted Pokémon
-    if (assignedPool.length === 0) {
-      const fallbackFilter: Parameters<typeof this.db.findAllPokemon>[0] = { restricted_status: 'none' };
-      if (challenger_region) fallbackFilter.native_region = challenger_region;
-      assignedPool = await this.db.findAllPokemon(fallbackFilter);
-    }
-    // If region filter still yields nothing, drop the region constraint
-    if (assignedPool.length === 0) {
-      assignedPool = await this.db.findAllPokemon({ restricted_status: 'none' });
-    }
+    // 2. Resolve counter-team candidate pool
+    const assignedPool = await this.resolveCounterPool(userId, challenger_region);
 
     this.logger.log(
       `Engine2: opponent=${opponentData.length}, assigned_pool=${assignedPool.length}` +
