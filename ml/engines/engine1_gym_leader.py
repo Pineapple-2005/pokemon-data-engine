@@ -248,6 +248,22 @@ def generate_team(
     if not filtered:
         raise ValueError(f"No Pokémon available for theme '{theme_label}'")
 
+    # Guard: if the type-filtered pool itself is too small to build a full team,
+    # expand it with the best off-theme Pokémon from the full pool.
+    # This ensures narrow type+region combinations (e.g. Ghost/Paldea with only
+    # 3 entries in the DB) can still produce a 6-member team.
+    # We pad to REQUIRED_TEAM_SIZE * 3 so the downstream difficulty filter
+    # still has a realistic pool to percentile-cut from.
+    if len(filtered) < REQUIRED_TEAM_SIZE:
+        filtered_names = {p.get("name") for p in filtered}
+        extras_sorted = sorted(
+            [p for p in pokemon_pool if p.get("name") not in filtered_names],
+            key=lambda p: _safe_float(p.get("total_base_stats", p.get("total", 0))),
+            reverse=True,
+        )
+        need = max(REQUIRED_TEAM_SIZE, REQUIRED_TEAM_SIZE * 3) - len(filtered)
+        filtered = filtered + extras_sorted[:need]
+
     # ------------------------------------------------------------------
     # Step 2 — Apply difficulty scaling (filter by total_base_stats)
     # ------------------------------------------------------------------
@@ -476,6 +492,31 @@ def generate_team(
             fallback_pool = [p for p in filtered if p.get("name") not in used_names]
             p = _weighted_quality_pick(
                 fallback_pool,
+                lambda candidate: _safe_float(candidate.get("total_base_stats", candidate.get("total", 300))) / 600.0,
+                rng,
+                avoid_names=previous_names,
+                quality_window=0.10,
+                max_candidates=5,
+            )
+            if p is None:
+                break
+            p_copy = dict(p)
+            p_copy["_role"] = _heuristic_role(p)
+            p_copy["_usefulness_score"] = _safe_float(p.get("total_base_stats", p.get("total", 300))) / 600.0
+            p_copy["_cos_sim"] = 0.0
+            selected_team.append(p_copy)
+            used_names.add(p["name"])
+
+    # Ultimate fallback: fill any remaining slots from the full pokemon_pool
+    # (reached only when both the themed pool and type-filtered pool are exhausted)
+    if len(selected_team) < REQUIRED_TEAM_SIZE:
+        while len(selected_team) < REQUIRED_TEAM_SIZE:
+            ultimate_pool = [
+                p for p in pokemon_pool
+                if p.get("name") not in used_names
+            ]
+            p = _weighted_quality_pick(
+                ultimate_pool,
                 lambda candidate: _safe_float(candidate.get("total_base_stats", candidate.get("total", 300))) / 600.0,
                 rng,
                 avoid_names=previous_names,
