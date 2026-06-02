@@ -144,7 +144,7 @@ function SectionEngine1() {
       <Heading>◆ HOW TO USE</Heading>
       <Body>
         Select a type speciality (e.g. Fire) and a Challenge Rank, then click CHOOSE THIS TEAM.
-        The ML pipeline builds a balanced 4-Pokémon team optimised for that gym type.
+        The ML pipeline builds a balanced 6-Pokémon team optimised for that gym type.
       </Body>
 
       <SubHeading>◆ INPUTS</SubHeading>
