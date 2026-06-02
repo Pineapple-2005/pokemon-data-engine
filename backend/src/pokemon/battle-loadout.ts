@@ -18,29 +18,35 @@ interface TeamPlan {
   coverageMoves: Set<string>;
 }
 
+// TYPE_MOVES: Both entries for each type must be broadly learnable TM/level-up
+// moves for most Pokemon of that type.  Avoid species-exclusive tutor moves
+// (Brave Bird, Flare Blitz, Seed Bomb, Wild Charge, Aura Sphere, Zen Headbutt,
+// Power Gem) which fail Showdown legality for the majority of a type's species.
 const TYPE_MOVES: Record<string, TypeMoves> = {
-  normal:   { physical: 'Body Slam',    special: 'Hyper Voice' },
-  fire:     { physical: 'Flare Blitz',  special: 'Flamethrower' },
-  water:    { physical: 'Waterfall',    special: 'Surf' },
-  electric: { physical: 'Wild Charge',  special: 'Thunderbolt' },
-  grass:    { physical: 'Seed Bomb',    special: 'Energy Ball' },
-  ice:      { physical: 'Ice Punch',    special: 'Ice Beam' },
-  fighting: { physical: 'Close Combat', special: 'Aura Sphere' },
-  poison:   { physical: 'Poison Jab',   special: 'Sludge Bomb' },
-  ground:   { physical: 'Earthquake',   special: 'Earth Power' },
-  flying:   { physical: 'Brave Bird',   special: 'Air Slash' },
-  psychic:  { physical: 'Zen Headbutt', special: 'Psychic' },
-  bug:      { physical: 'X-Scissor',    special: 'Bug Buzz' },
-  rock:     { physical: 'Rock Slide',   special: 'Power Gem' },
-  ghost:    { physical: 'Shadow Claw',  special: 'Shadow Ball' },
-  dragon:   { physical: 'Dragon Claw',  special: 'Dragon Pulse' },
-  dark:     { physical: 'Knock Off',    special: 'Dark Pulse' },
-  steel:    { physical: 'Iron Head',    special: 'Flash Cannon' },
-  fairy:    { physical: 'Play Rough',   special: 'Moonblast' },
+  normal:   { physical: 'Body Slam',      special: 'Hyper Voice' },
+  fire:     { physical: 'Flame Charge',   special: 'Flamethrower' },
+  water:    { physical: 'Waterfall',      special: 'Surf' },
+  electric: { physical: 'Spark',          special: 'Thunderbolt' },
+  grass:    { physical: 'Razor Leaf',     special: 'Energy Ball' },
+  ice:      { physical: 'Ice Shard',      special: 'Ice Beam' },
+  fighting: { physical: 'Brick Break',    special: 'Focus Blast' },
+  poison:   { physical: 'Poison Jab',     special: 'Sludge Bomb' },
+  ground:   { physical: 'Earthquake',     special: 'Earth Power' },
+  flying:   { physical: 'Aerial Ace',     special: 'Air Slash' },
+  psychic:  { physical: 'Psycho Cut',     special: 'Psychic' },
+  bug:      { physical: 'X-Scissor',      special: 'Bug Buzz' },
+  rock:     { physical: 'Rock Slide',     special: 'Ancient Power' },
+  ghost:    { physical: 'Shadow Claw',    special: 'Shadow Ball' },
+  dragon:   { physical: 'Dragon Claw',    special: 'Dragon Pulse' },
+  dark:     { physical: 'Bite',           special: 'Dark Pulse' },
+  steel:    { physical: 'Iron Head',      special: 'Flash Cannon' },
+  fairy:    { physical: 'Disarming Voice', special: 'Moonblast' },
 };
 
 const COVERAGE_MOVES: Record<AttackStyle, string[]> = {
-  physical: ['Earthquake', 'Rock Slide', 'Ice Punch', 'Knock Off', 'Brick Break'],
+  // All physical coverage moves are broadly distributed TMs
+  physical: ['Earthquake', 'Rock Slide', 'Brick Break', 'Aerial Ace', 'Shadow Claw'],
+  // All special coverage moves are broadly distributed TMs
   special:  ['Ice Beam', 'Thunderbolt', 'Flamethrower', 'Energy Ball', 'Shadow Ball'],
 };
 
@@ -50,13 +56,25 @@ const STRONG_ABILITIES = [
   'serene-grace', 'natural-cure', 'pressure',
 ];
 
+// LEARNSET-CHECKED fallbacks: run through canLearn() so they are only used
+// when the Pokemon's PokéAPI learnset confirms it can learn them.
+// Moves with narrow species pools (Stealth Rock, Roost, Defog, U-turn,
+// Volt Switch, Leech Seed, Reflect, Light Screen, Encore, Rapid Spin,
+// Substitute, Soft-Boiled, Wish) are intentionally excluded here.
 const FALLBACK_MOVES = [
-  'Protect', 'Substitute', 'Rest', 'Toxic', 'Thunder Wave', 'Will-O-Wisp',
-  'Stealth Rock', 'Roost', 'Recover', 'Soft-Boiled', 'Wish', 'Defog',
-  'Rapid Spin', 'Taunt', 'U-turn', 'Volt Switch', 'Leech Seed', 'Reflect',
-  'Light Screen', 'Encore', 'Body Slam', 'Earthquake', 'Rock Slide',
+  'Protect', 'Rest', 'Toxic', 'Thunder Wave', 'Will-O-Wisp',
+  'Recover', 'Body Slam', 'Earthquake', 'Rock Slide',
   'Ice Beam', 'Thunderbolt', 'Flamethrower', 'Energy Ball', 'Shadow Ball',
-  'Knock Off', 'Brick Break',
+  'Brick Break', 'Aerial Ace',
+];
+
+// SAFE_FALLBACK_MOVES: used only when the PokéAPI learnset fetch failed
+// (learnset === undefined).  These are TMs/HMs available to virtually every
+// Pokemon in the main series games, making them safe to assign without
+// individual learnset verification.
+const SAFE_FALLBACK_MOVES = [
+  'Protect', 'Toxic', 'Rest', 'Body Slam', 'Earthquake',
+  'Ice Beam', 'Flamethrower', 'Thunderbolt',
 ];
 
 const learnsetCache = new Map<number, Promise<Set<string> | undefined>>();
@@ -162,8 +180,12 @@ function chooseCoverageMove(
 }
 
 function chooseRecoveryMove(learnset?: Set<string>): string | undefined {
-  return ['Recover', 'Roost', 'Soft-Boiled', 'Wish', 'Rest']
-    .find((move) => canLearn(move, learnset));
+  // Roost is flying-specific, Soft-Boiled is Chansey/Blissey only —
+  // skip them when there is no learnset to validate against.
+  const candidates = learnset !== undefined
+    ? ['Recover', 'Roost', 'Soft-Boiled', 'Wish', 'Rest']
+    : ['Recover', 'Rest'];
+  return candidates.find((move) => canLearn(move, learnset));
 }
 
 function chooseItem(role: string, style: AttackStyle, ability: string): string {
@@ -195,6 +217,80 @@ function chooseEvs(role: string, style: AttackStyle, pokemon?: Pokemon): string 
     : '4 HP / 252 SpA / 252 Spe';
 }
 
+/** Add STAB move(s) for the Pokemon's primary type (and optionally type 2). */
+function addStabMoves(
+  moves: string[],
+  slot: TeamSlot,
+  style: AttackStyle,
+  ability: string,
+  learnset?: Set<string>,
+): void {
+  const type1 = TYPE_MOVES[slot.type_1?.toLowerCase() ?? 'normal'] ?? TYPE_MOVES.normal;
+  const type2 = slot.type_2 ? TYPE_MOVES[slot.type_2.toLowerCase()] : undefined;
+  const isDefensive = ['support', 'wall', 'tank'].includes(slot.role.toLowerCase());
+
+  if (ability === 'Guts' && slot.type_1?.toLowerCase() === 'normal') {
+    addMove(moves, 'Facade', learnset);
+  } else {
+    addMove(moves, type1[style], learnset);
+    // Fallback to the other attack style when the preferred STAB was rejected
+    if (moves.length === 0) {
+      addMove(moves, type1[style === 'physical' ? 'special' : 'physical'], learnset);
+    }
+  }
+
+  if (!isDefensive) addMove(moves, type2?.[style], learnset);
+  // Guts users always want Facade as a second STAB
+  if (ability === 'Guts') addMove(moves, 'Facade', learnset);
+}
+
+/** Add role-specific utility moves (hazards, status, recovery, setup). */
+function addRoleMoves(
+  moves: string[],
+  role: string,
+  style: AttackStyle,
+  plan: TeamPlan,
+  learnset?: Set<string>,
+): void {
+  // Stealth Rock only when learnset confirms the Pokemon can learn it
+  const isDefensive = role === 'support' || role === 'wall' || role === 'tank';
+  if (isDefensive && !plan.hazardsAssigned && learnset !== undefined) {
+    plan.hazardsAssigned = addMove(moves, 'Stealth Rock', learnset);
+  }
+
+  if (role === 'support' || role === 'wall') {
+    addMove(moves, chooseStatusMove(plan, learnset), learnset);
+    addMove(moves, chooseRecoveryMove(learnset), learnset);
+    addMove(moves, 'Protect', learnset);
+    return;
+  }
+
+  if (role === 'tank') {
+    addMove(moves, chooseCoverageMove(style, plan, moves, learnset), learnset);
+    addMove(moves, chooseRecoveryMove(learnset), learnset);
+    return;
+  }
+
+  // sweeper / ace / balanced
+  addMove(moves, chooseCoverageMove(style, plan, moves, learnset), learnset);
+  // Setup moves only when learnset can validate them
+  if ((role === 'sweeper' || role === 'ace') && learnset !== undefined) {
+    addMove(moves, style === 'physical' ? 'Swords Dance' : 'Calm Mind', learnset);
+  }
+  if (role === 'balanced') addMove(moves, chooseStatusMove(plan, learnset), learnset);
+}
+
+/** Fill remaining slots, first with learnset-checked moves then safe universals. */
+function fillMoves(moves: string[], plan: TeamPlan, style: AttackStyle, learnset?: Set<string>): void {
+  addMove(moves, chooseCoverageMove(style, plan, moves, learnset), learnset);
+  for (const fallback of FALLBACK_MOVES) addMove(moves, fallback, learnset);
+  // When learnset was unavailable many candidates were skipped — use universals
+  for (const safe of SAFE_FALLBACK_MOVES) {
+    if (moves.length >= 4) break;
+    if (!moves.includes(safe)) moves.push(safe);
+  }
+}
+
 function chooseMoves(
   slot: TeamSlot,
   pokemon: Pokemon | undefined,
@@ -205,38 +301,11 @@ function chooseMoves(
   const role = slot.role.toLowerCase();
   const style = chooseStyle(pokemon);
   const moves: string[] = [];
-  const type1 = TYPE_MOVES[slot.type_1?.toLowerCase() ?? 'normal'] ?? TYPE_MOVES.normal;
-  const type2 = slot.type_2 ? TYPE_MOVES[slot.type_2.toLowerCase()] : undefined;
 
-  if (ability === 'Guts' && slot.type_1?.toLowerCase() === 'normal') {
-    addMove(moves, 'Facade', learnset);
-  } else {
-    addMove(moves, type1[style], learnset);
-  }
-  if (!['support', 'wall', 'tank'].includes(role)) addMove(moves, type2?.[style], learnset);
-  if (ability === 'Guts') addMove(moves, 'Facade', learnset);
+  addStabMoves(moves, slot, style, ability, learnset);
+  addRoleMoves(moves, role, style, plan, learnset);
+  fillMoves(moves, plan, style, learnset);
 
-  if ((role === 'support' || role === 'wall' || role === 'tank') && !plan.hazardsAssigned) {
-    plan.hazardsAssigned = addMove(moves, 'Stealth Rock', learnset);
-  }
-
-  if (role === 'support' || role === 'wall') {
-    addMove(moves, chooseStatusMove(plan, learnset), learnset);
-    addMove(moves, chooseRecoveryMove(learnset), learnset);
-    addMove(moves, 'Protect', learnset);
-  } else if (role === 'tank') {
-    addMove(moves, chooseCoverageMove(style, plan, moves, learnset), learnset);
-    addMove(moves, chooseRecoveryMove(learnset), learnset);
-  } else {
-    addMove(moves, chooseCoverageMove(style, plan, moves, learnset), learnset);
-    if (role === 'sweeper' || role === 'ace') {
-      addMove(moves, style === 'physical' ? 'Swords Dance' : 'Calm Mind', learnset);
-    }
-    if (role === 'balanced') addMove(moves, chooseStatusMove(plan, learnset), learnset);
-  }
-
-  addMove(moves, chooseCoverageMove(style, plan, moves, learnset), learnset);
-  for (const fallback of FALLBACK_MOVES) addMove(moves, fallback, learnset);
   return moves.slice(0, 4) as [string, string, string, string];
 }
 
