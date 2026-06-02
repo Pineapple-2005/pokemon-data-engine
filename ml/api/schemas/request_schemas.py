@@ -177,7 +177,7 @@ class Engine1Response(BaseModel):
 
 class Engine2Request(BaseModel):
     opponent_team: list[str] = Field(
-        ..., min_length=1, max_length=4,
+        ..., min_length=1, max_length=6,
         description="List of opponent Pokémon names"
     )
     opponent_data: list[PokemonData] = Field(
@@ -233,8 +233,8 @@ class Engine3PredictRequest(BaseModel):
     """
     battler_a: Optional[str] = Field(None, description="Label for Team A (e.g. trainer name)")
     battler_b: Optional[str] = Field(None, description="Label for Team B")
-    team_a_data: list[PokemonData] = Field(..., min_length=1, max_length=4)
-    team_b_data: list[PokemonData] = Field(..., min_length=1, max_length=4)
+    team_a_data: list[PokemonData] = Field(..., min_length=1, max_length=6)
+    team_b_data: list[PokemonData] = Field(..., min_length=1, max_length=6)
 
 
 class Engine3PredictResponse(BaseModel):

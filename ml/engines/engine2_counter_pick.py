@@ -417,7 +417,7 @@ def generate_counter_team(
     # Step 3 — Sort, then apply diversity re-rank
     # ------------------------------------------------------------------
     scored_candidates.sort(key=lambda x: x["counter_score"], reverse=True)
-    top_picks = _diversified_top_n(scored_candidates, n=4)
+    top_picks = _diversified_top_n(scored_candidates, n=6)
 
     recommended_team = []
     for rank, entry in enumerate(top_picks, start=1):

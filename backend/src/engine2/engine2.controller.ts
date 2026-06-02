@@ -20,7 +20,7 @@ import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
 class CounterTeamDto {
   @IsArray()
   @ArrayNotEmpty()
-  @ArrayMaxSize(4)
+  @ArrayMaxSize(6)
   @IsString({ each: true })
   opponent_team: string[];
 
@@ -40,7 +40,7 @@ class CounterTeamDto {
 class CounterFromDataDto {
   @IsArray()
   @ArrayNotEmpty()
-  @ArrayMaxSize(4)
+  @ArrayMaxSize(6)
   @ValidateNested({ each: true })
   @Type(() => Object)
   opponent_team: Record<string, unknown>[];
