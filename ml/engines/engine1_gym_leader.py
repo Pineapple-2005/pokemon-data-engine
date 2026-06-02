@@ -1,7 +1,7 @@
 """
 Engine 1 — Gym Leader Team Generator
 ======================================
-Builds a 4-Pokémon themed team for a Gym Leader using:
+Builds a 6-Pokémon themed team for a Gym Leader using:
   • K-Means clustering (k=5) on stat features → cluster role assignment
   • Decision Tree (max_depth=5) → role prediction for each Pokémon
   • Random Forest (n_estimators=50) → usefulness scoring
@@ -379,7 +379,7 @@ def generate_team(
         rng,
         avoid_names=previous_names,
         quality_window=0.08,
-        max_candidates=4,
+        max_candidates=6,
     )
     ace_idx = ace_pick["_original_index"] if ace_pick is not None else int(np.argmax(cos_sims))
     working_pool[ace_idx]["_role"] = "ace"

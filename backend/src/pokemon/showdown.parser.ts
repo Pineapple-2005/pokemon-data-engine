@@ -37,7 +37,7 @@ export function normalizePokemonName(rawName: string): string {
 // ---------------------------------------------------------------------------
 // parseShowdownTeam
 //
-// Accepts Pokémon Showdown export text and returns up to 4 lowercase
+// Accepts Pokémon Showdown export text and returns up to 6 lowercase
 // Pokémon names.  Lines that are blank, section headers (===...===), or
 // move lines (starting with -) are skipped.  Handles:
 //   "Pikachu"              → "pikachu"
